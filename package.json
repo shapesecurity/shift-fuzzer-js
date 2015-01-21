@@ -1,0 +1,43 @@
+{
+  "name": "shift-fuzzer",
+  "version": "1.0.0",
+  "description": "generate random valid Shift format ASTs",
+  "author": "Shape Security Labs",
+  "homepage": "https://github.com/shapesecurity/shift-fuzzer-js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shapesecurity/shift-fuzzer-js.git"
+  },
+  "main": "lib/index.js",
+  "files": [
+    "lib"
+  ],
+  "scripts": {
+    "test": "mocha --compilers js:6to5/lib/6to5/register --inline-diffs --check-leaks --ui tdd --reporter dot --recursive test",
+    "build": "6to5 --source-maps-inline --out-dir lib src"
+  },
+  "dependencies": {
+    "object-assign": "^2.0.0",
+    "shift-ast": "^1.0.3"
+  },
+  "devDependencies": {
+    "6to5": "^1.14.17",
+    "mocha": "^2.0.1"
+  },
+  "keywords": [
+    "Shift",
+    "AST",
+    "fuzzer",
+    "fuzz",
+    "generate",
+    "generator",
+    "random",
+    "abstract",
+    "syntax",
+    "tree"
+  ],
+  "bugs": {
+    "url": "https://github.com/shapesecurity/shift-fuzzer-js/issues"
+  },
+  "license": "Apache-2.0"
+}
