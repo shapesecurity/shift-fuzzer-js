@@ -21,8 +21,8 @@ export default class Random {
     this.rng = rng;
   }
 
-  nextBoolean() {
-    return this.rng() < 0.5;
+  nextBoolean(p = 0.5) {
+    return this.rng() < p;
   }
 
   nextInt(bound) {

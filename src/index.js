@@ -24,17 +24,23 @@ import { ap, choose, guardDepth, many, many1, manyN, oneOf, opt, } from "./combi
 const RESERVED =  [ // todo import this
   // keywords
   'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger',
-  'default', 'delete', 'do', 'else', 'enum', 'export', 'extends', 'finally',
+  'default', 'delete', 'do', 'else', 'export', 'extends', 'finally',
   'for', 'function', 'if', 'import', 'in', 'instanceof', 'new', 'return',
   'super', 'switch', 'this', 'throw', 'try', 'typeof', 'var', 'void', 'while',
   'with',
-  // future reserved words
-  'class', 'const', 'enum', 'export', 'extends', 'implements', 'import',
-  'interface', 'let', 'package', 'private', 'protected', 'public', 'static',
-  'super', 'yield',
   // null, booleans
   'null', 'true', 'false',
-]; // todo strict mode reserved words
+];
+
+const STRICT_FORBIDDEN = [
+  'implements', 'package', 'protected', 'interface', 'private', 'public',
+  'static', 'enum'
+];
+
+const ALL_KNOWN_WORDS = [...RESERVED, ...STRICT_FORBIDDEN, 'let', 'yield', 'await', 'eval', 'arguments'];
+
+// special cases: 'let', 'yield', 'await', 'eval', 'arguments'
+
 
 function identifierStart(fuzzerState) { // todo. see also https://gist.github.com/mathiasbynens/6334847#file-javascript-identifier-regex-js-L65-L105
   return String.fromCharCode(97 + fuzzerState.rng.nextInt(25));
@@ -43,16 +49,50 @@ function identifierStart(fuzzerState) { // todo. see also https://gist.github.co
 const identifierPart = identifierStart; // todo
 const MAX_IDENT_LENGTH = 15;
 
-function genIdentifierString(f) {
+const genIdentifierString = f => identifierStart(f) + manyN(MAX_IDENT_LENGTH)(identifierPart)(f).join("");
+
+const fuzzVariableName = (f, isBinding) => {
+  let interestingNames = [];
+  let forbiddenNames = [...RESERVED];
+  if (f.strict) {
+    forbiddenNames.push(...STRICT_FORBIDDEN, 'let', 'yield');
+  } else {
+    interestingNames.push(...STRICT_FORBIDDEN);
+    (f.declKind === 'let' || f.declKind === 'const' ? forbiddenNames : interestingNames).push('let');
+    (!f.allowYieldIdentifier ? forbiddenNames : interestingNames).push('yield');
+  }
+  (f.strict && isBinding ? forbiddenNames : interestingNames).push('eval', 'arguments');
+  (!f.allowAwaitIdenifier ? forbiddenNames : interestingNames).push('await'); // this has the odd effect that strict-mode scripts have lots of variables named await.
+
+  return fuzzIdentifier(f, interestingNames, forbiddenNames);
+}
+
+const fuzzLabel = f => { // todo consider collapsing into fuzzVariableName(f, false);
+  let interestingNames = ['eval', 'arguments'];
+  let forbiddenNames = [...RESERVED];
+  if (f.strict) {
+    forbiddenNames.push(...STRICT_FORBIDDEN, 'let', 'yield');
+  } else {
+    interestingNames.push(...STRICT_FORBIDDEN, 'let');
+    (!f.allowYieldIdentifier ? forbiddenNames : interestingNames).push('yield');
+  }
+  (!f.allowAwaitIdenifier ? forbiddenNames : interestingNames).push('await');
+
+  return fuzzIdentifier(f, interestingNames, forbiddenNames);
+}
+
+const fuzzIdentifier = (f, interestingNames, forbiddenNames) => {
+  if (interestingNames.length > 0 && f.nextBoolean()) {
+    return oneOf(...interestingNames)(f);
+  }
+
   while (true) {
-    let possibleIdentifier = identifierStart(f) + manyN(MAX_IDENT_LENGTH)(identifierPart)(f).join("");
-    if (RESERVED.indexOf(possibleIdentifier) < 0) return possibleIdentifier;
+    let possibleIdentifier = genIdentifierString(f);
+    if (forbiddenNames.indexOf(possibleIdentifier) < 0) return possibleIdentifier;
   }
 }
 
-const fuzzIdentifier = genIdentifierString;
-
-const fuzzIdentifierName = choose(genIdentifierString, oneOf(...RESERVED));
+const fuzzIdentifierName = choose(genIdentifierString, oneOf(...ALL_KNOWN_WORDS));;
 
 const fuzzString = f => f.rng.nextString(); // todo most uses require more specificity than this
 
@@ -67,14 +107,27 @@ export const fuzzArrayBinding = f =>
 export const fuzzArrayExpression = f =>
   ap(Shift.ArrayExpression, {"elements": many(opt(choose(fuzzExpression, fuzzSpreadElement)))}, f);
 
-export const fuzzArrowExpression = f =>
-  ap(Shift.ArrowExpression, {"params": fuzzFormalParameters, "body": choose(fuzzExpression, fuzzFunctionBody)}, f);
+export const fuzzArrowExpression = (f = new FuzzerState) => {
+  let isConsise = f.nextBoolean();
+  let params, body;
+  if (!isConsise) {
+    let {directives, hasStrictDirective} = fuzzDirectives(f);
+    f = f.goDeeper().enterFunction({isArrow: true, hasStrictDirective});
+    params = fuzzFormalParameters(f, {hasStrictDirective});
+    body = new Shift.FunctionBody({directives, statements: many(fuzzStatement)(f.goDeeper())});
+  } else {
+    f = f.goDeeper().enterFunction({isArrow: true});
+    params = fuzzFormalParameters(f);
+    body = fuzzExpression(f);
+  }
+  return new Shift.ArrowExpression({params, body});
+}
 
 export const fuzzAssignmentExpression = f =>
   ap(Shift.AssignmentExpression, {"binding": choose(choose(fuzzArrayAssignmentTarget, fuzzObjectAssignmentTarget), choose(fuzzAssignmentTargetIdentifier, choose(fuzzComputedMemberAssignmentTarget, fuzzStaticMemberAssignmentTarget))), "expression": fuzzExpression}, f);
 
 export const fuzzAssignmentTargetIdentifier = f =>
-  ap(Shift.AssignmentTargetIdentifier, {"name": fuzzIdentifier}, f);
+  ap(Shift.AssignmentTargetIdentifier, {"name": f => fuzzVariableName(f, true)}, f);
 
 export const fuzzAssignmentTargetPropertyIdentifier = f =>
   ap(Shift.AssignmentTargetPropertyIdentifier, {"binding": fuzzAssignmentTargetIdentifier, "init": opt(fuzzExpression)}, f);
@@ -89,7 +142,7 @@ export const fuzzBinaryExpression = f =>
   ap(Shift.BinaryExpression, {"left": fuzzExpression, "operator": oneOf("==", "!=", "===", "!==", "<", "<=", ">", ">=", "in", "instanceof", "<<", ">>", ">>>", "+", "-", "*", "/", "%", "**", ",", "||", "&&", "|", "^", "&"), "right": fuzzExpression}, f);
 
 export const fuzzBindingIdentifier = f =>
-  ap(Shift.BindingIdentifier, {"name": fuzzIdentifier}, f);
+  ap(Shift.BindingIdentifier, {"name": f => fuzzVariableName(f, true)}, f);
 
 export const fuzzBindingPropertyIdentifier = f =>
   ap(Shift.BindingPropertyIdentifier, {"binding": fuzzBindingIdentifier, "init": opt(fuzzExpression)}, f);
@@ -107,7 +160,7 @@ export const fuzzBlockStatement = f =>
   ap(Shift.BlockStatement, {"block": fuzzBlock}, f);
 
 export const fuzzBreakStatement = f =>
-  ap(Shift.BreakStatement, {"label": opt(fuzzIdentifier)}, f);
+  ap(Shift.BreakStatement, {"label": f => f.labels.length > 0 && (!(f.inIteration || f.inSwitch) || f.nextBoolean()) ? oneOf(...f.labels)(f) : null}, f);
 
 export const fuzzCallExpression = f =>
   ap(Shift.CallExpression, {"callee": fuzzExpressionSuperCall, "arguments": many(choose(fuzzExpression, fuzzSpreadElement))}, f);
@@ -115,14 +168,32 @@ export const fuzzCallExpression = f =>
 export const fuzzCatchClause = f =>
   ap(Shift.CatchClause, {"binding": choose(fuzzBindingIdentifier, choose(fuzzArrayBinding, fuzzObjectBinding)), "body": fuzzBlock}, f);
 
-export const fuzzClassDeclaration = f =>
-  ap(Shift.ClassDeclaration, {"name": fuzzBindingIdentifier, "super": opt(fuzzExpression), "elements": many(fuzzClassElement)}, f);
+export const fuzzClassDeclaration = (f = new FuzzerState) => {
+  f = f.goDeeper();
+  f.inIteration = f.inSwitch = false;
+  let name = fuzzBindingIdentifier(f);
+  f.strict = true;
+  let _super = opt(fuzzExpression)(f);
+  let elements = many(f => fuzzClassElement(f, {constructorMayContainSuperCall: true}))(f);
+  return new Shift.ClassDeclaration({name, "super": _super, elements});
+}
 
-export const fuzzClassElement = f =>
-  ap(Shift.ClassElement, {"isStatic": f => f.rng.nextBoolean(), "method": choose(fuzzGetter, fuzzMethod, fuzzSetter)}, f);
+export const fuzzClassElement = (f = new FuzzerState, {constructorMayContainSuperCall = false} = {}) => {
+  f = f.goDeeper();
+  let isStatic = f.rng.nextBoolean();
+  let method = choose(f => fuzzGetter(f, {isStatic, inClass: true}), f => fuzzMethod(f, {isStatic, inClass: true, constructorMayContainSuperCall}), f => fuzzSetter({isStatic, inClass: true}))(f);
+  return new Shift.ClassElement({isStatic, method});
+}
 
-export const fuzzClassExpression = f =>
-  ap(Shift.ClassExpression, {"name": opt(fuzzBindingIdentifier), "super": opt(fuzzExpression), "elements": many(fuzzClassElement)}, f);
+export const fuzzClassExpression = (f = new FuzzerState) => {
+  f = f.goDeeper();
+  f.inIteration = f.inSwitch = false;
+  let name = opt(fuzzBindingIdentifier)(f);
+  f.strict = true;
+  let _super = opt(fuzzExpression)(f);
+  let elements = many(f => fuzzClassElement(f, {constructorMayContainSuperCall: true}))(f);
+  return new Shift.ClassExpression({name, "super": _super, elements});
+}
 
 export const fuzzCompoundAssignmentExpression = f =>
   ap(Shift.CompoundAssignmentExpression, {"binding": choose(fuzzAssignmentTargetIdentifier, choose(fuzzComputedMemberAssignmentTarget, fuzzStaticMemberAssignmentTarget)), "operator": oneOf("+=", "-=", "*=", "/=", "%=", "**=", "<<=", ">>=", ">>>=", "|=", "^=", "&="), "expression": fuzzExpression}, f);
@@ -140,7 +211,7 @@ export const fuzzConditionalExpression = f =>
   ap(Shift.ConditionalExpression, {"test": fuzzExpression, "consequent": fuzzExpression, "alternate": fuzzExpression}, f);
 
 export const fuzzContinueStatement = f =>
-  ap(Shift.ContinueStatement, {"label": opt(fuzzIdentifier)}, f);
+  ap(Shift.ContinueStatement, {"label": f => f.loopLabels.length > 0 && f.nextBoolean() ? oneOf(...f.iterationLabels)(f) : null}, f);
 
 export const fuzzDataProperty = f =>
   ap(Shift.DataProperty, {"name": choose(fuzzComputedPropertyName, fuzzStaticPropertyName), "expression": fuzzExpression}, f);
@@ -190,23 +261,27 @@ export const fuzzForOfStatement = f =>
 export const fuzzForStatement = f =>
   ap(Shift.ForStatement, {"init": opt(choose(fuzzExpression, fuzzVariableDeclaration)), "test": opt(fuzzExpression), "update": opt(fuzzExpression), "body": fuzzStatement}, f);
 
-export const fuzzFormalParameters = (f = new FuzzerState) =>
-  ap(Shift.FormalParameters, {"items": many(choose(fuzzBindingWithDefault, choose(fuzzBindingIdentifier, choose(fuzzArrayBinding, fuzzObjectBinding)))), "rest": opt(choose(fuzzBindingIdentifier, choose(fuzzArrayBinding, fuzzObjectBinding)))}, f);
+export const fuzzFormalParameters = (f = new FuzzerState, {hasStrictDirective = false} = {}) => {
+  if (hasStrictDirective) {
+    return new Shift.FormalParameters({items: many(fuzzBindingIdentifier)(f), rest: null}); // note that f.strict should be set by the callee in this case
+  }
+  return ap(Shift.FormalParameters, {"items": many(choose(fuzzBindingWithDefault, choose(fuzzBindingIdentifier, choose(fuzzArrayBinding, fuzzObjectBinding)))), "rest": opt(choose(fuzzBindingIdentifier, choose(fuzzArrayBinding, fuzzObjectBinding)))}, f.disableYieldExpr());
+}
 
 export const fuzzFunctionBody = f =>
   ap(Shift.FunctionBody, {"directives": many(fuzzDirective), "statements": many(fuzzStatement)}, f);
 
-export const fuzzFunctionDeclaration = f =>
+export const fuzzFunctionDeclaration = (f = new FuzzerState, {allowProperDeclarations = true} = {}) =>
   ap(Shift.FunctionDeclaration, {"isGenerator": f => f.rng.nextBoolean(), "name": fuzzBindingIdentifier, "params": fuzzFormalParameters, "body": fuzzFunctionBody}, f);
 
 export const fuzzFunctionExpression = f =>
   ap(Shift.FunctionExpression, {"isGenerator": f => f.rng.nextBoolean(), "name": opt(fuzzBindingIdentifier), "params": fuzzFormalParameters, "body": fuzzFunctionBody}, f);
 
-export const fuzzGetter = f =>
+export const fuzzGetter = (f = new FuzzerState, {isStatic = false, inClass = false} = {}) =>
   ap(Shift.Getter, {"name": choose(fuzzComputedPropertyName, fuzzStaticPropertyName), "body": fuzzFunctionBody}, f);
 
 export const fuzzIdentifierExpression = f =>
-  ap(Shift.IdentifierExpression, {"name": fuzzIdentifier}, f);
+  ap(Shift.IdentifierExpression, {"name": f => fuzzVariableName(f, false)}, f);
 
 export const fuzzIfStatement = f =>
   ap(Shift.IfStatement, {"test": fuzzExpression, "consequent": fuzzStatement, "alternate": opt(fuzzStatement)}, f);
@@ -220,8 +295,19 @@ export const fuzzImportNamespace = f =>
 export const fuzzImportSpecifier = f =>
   ap(Shift.ImportSpecifier, {"name": opt(fuzzIdentifierName), "binding": fuzzBindingIdentifier}, f);
 
-export const fuzzLabeledStatement = f =>
-  ap(Shift.LabeledStatement, {"label": fuzzIdentifier, "body": fuzzStatement}, f);
+export const fuzzLabeledStatement = (f = new FuzzerState) => {
+  f = f.goDeeper();
+  let label = fuzzLabel(f);
+  let body;
+  f.labels = f.labels.concat([label]);
+  if (f.nextBoolean()) {
+    f.iterationLabels = f.iterationLabels.concat([label]);
+    body = choose(loopFuzzers)(f);
+  } else {
+    body = fuzzStatement(f, {allowLoops: false, allowProperDeclarations: false, allowFunctionDeclarations: f.isStrict});
+  }
+  return new Shift.LabeledStatement({label, body});
+}
 
 export const fuzzLiteralBooleanExpression = f =>
   ap(Shift.LiteralBooleanExpression, {"value": f => f.rng.nextBoolean()}, f);
@@ -248,11 +334,26 @@ export const fuzzLiteralRegExpExpression = f =>
 export const fuzzLiteralStringExpression = f =>
   ap(Shift.LiteralStringExpression, {"value": fuzzString}, f);
 
-export const fuzzMethod = f =>
-  ap(Shift.Method, {"isGenerator": f => f.rng.nextBoolean(), "name": choose(fuzzComputedPropertyName, fuzzStaticPropertyName), "params": fuzzFormalParameters, "body": fuzzFunctionBody}, f);
+export const fuzzMethod = (f = new FuzzerState, {isStatic = false, constructorMayContainSuperCall = false} = {}) => {
+  f = f.goDeeper();
+  let {directives, hasStrictDirective} = fuzzDirectives(f);
+  let isConstructor = !isStatic && f.nextBoolean(.3); // todo prohibit duplicate constructors
+  let isGenerator = !isConstructor && f.nextBoolean();
+  let name = isConstructor ? new Shift.StaticPropertyName({value: "constructor"}) : choose(fuzzComputedPropertyName, fuzzStaticPropertyName)(f); // todo prohibit non-static methods named constructor and static methods named prototype
+  f = f.enterFunction({isMethod: true, isGenerator, hasStrictDirective});
+  f.allowSuperCall = isConstructor && constructorMayContainSuperCall;
+  f.allowSuperProp = true;
+  let params = fuzzFormalParameters(f, {hasStrictDirective});
+  let body = new Shift.FunctionBody({directives, statements: many(fuzzStatement)(f.goDeeper())});
+  return new Shift.Method({isGenerator, name, params, body});
+}
 
-export const fuzzModule = f =>
+export const fuzzModule = (f = new FuzzerState) => {
+  f = f.clone();
+  f.strict = true;
+  f.allowAwaitIdenifier = false;
   ap(Shift.Module, {"directives": many(fuzzDirective), "items": many(choose(choose(fuzzExport, fuzzExportAllFrom, fuzzExportDefault, fuzzExportFrom, fuzzExportLocals), choose(fuzzImport, fuzzImportNamespace), fuzzStatement))}, f);
+}
 
 export const fuzzNewExpression = f =>
   ap(Shift.NewExpression, {"callee": fuzzExpression, "arguments": many(choose(fuzzExpression, fuzzSpreadElement))}, f);
@@ -272,10 +373,14 @@ export const fuzzObjectExpression = f =>
 export const fuzzReturnStatement = f =>
   ap(Shift.ReturnStatement, {"expression": opt(fuzzExpression)}, f);
 
-export const fuzzScript = f =>
-  ap(Shift.Script, {"directives": many(fuzzDirective), "statements": many(fuzzStatement)}, f);
+export const fuzzScript = (f = new FuzzerState) => {
+  f = f.goDeeper();
+  let {directives, hasStrictDirective} = fuzzDirectives(f);
+  f.strict = hasStrictDirective;
+  return new Shift.Script({directives, statements: many(fuzzStatement)(f)})
+}
 
-export const fuzzSetter = f =>
+export const fuzzSetter = (f = new FuzzerState, {isStatic = false, inClass = false} = {}) =>
   ap(Shift.Setter, {"name": choose(fuzzComputedPropertyName, fuzzStaticPropertyName), "param": choose(fuzzBindingWithDefault, choose(fuzzBindingIdentifier, choose(fuzzArrayBinding, fuzzObjectBinding))), "body": fuzzFunctionBody}, f);
 
 export const fuzzShorthandProperty = f =>
@@ -332,14 +437,27 @@ export const fuzzUnaryExpression = f =>
 export const fuzzUpdateExpression = f =>
   ap(Shift.UpdateExpression, {"isPrefix": f => f.rng.nextBoolean(), "operator": oneOf("++", "--"), "operand": choose(fuzzAssignmentTargetIdentifier, choose(fuzzComputedMemberAssignmentTarget, fuzzStaticMemberAssignmentTarget))}, f);
 
-export const fuzzVariableDeclaration = f =>
-  ap(Shift.VariableDeclaration, {"kind": oneOf("var", "let", "const"), "declarators": many(fuzzVariableDeclarator)}, f);
+export const fuzzVariableDeclaration = (f = new FuzzerState, {allowProperDeclarations = true, inForInOfHead = false} = {}) => {
+  f = f.goDeeper();
+  let kind = allowProperDeclarations ? oneOf("var", "let", "const")(f) : "var";
+  f.declKind = kind;
+  let declarators;
+  if (inForInOfHead) {
+    declarators = [fuzzVariableDeclarator(f, {inForInOfHead})];
+  } else {
+    declarators = many1(fuzzVariableDeclarator)(f);
+  }
+  return new Shift.VariableDeclaration({kind, declarators});
+}
 
-export const fuzzVariableDeclarationStatement = f =>
+export const fuzzVariableDeclarationStatement = (f = new FuzzerState, {allowProperDeclarations = true} = {}) =>
   ap(Shift.VariableDeclarationStatement, {"declaration": fuzzVariableDeclaration}, f);
 
-export const fuzzVariableDeclarator = f =>
-  ap(Shift.VariableDeclarator, {"binding": choose(fuzzBindingIdentifier, choose(fuzzArrayBinding, fuzzObjectBinding)), "init": opt(fuzzExpression)}, f);
+export const fuzzVariableDeclarator = (f = new FuzzerState, {inForInOfHead = false} = {}) =>
+  ap(Shift.VariableDeclarator, {
+    "binding": choose(fuzzBindingIdentifier, choose(fuzzArrayBinding, fuzzObjectBinding)),
+    "init": inForInOfHead ? f => null : (f.declKind === 'const' ? fuzzExpression : opt(fuzzExpression))
+  }, f);
 
 export const fuzzWhileStatement = f =>
   ap(Shift.WhileStatement, {"test": fuzzExpression, "body": fuzzStatement}, f);
@@ -398,8 +516,7 @@ const simpleStmtFuzzers = [
   fuzzThrowStatement,
   fuzzTryCatchStatement,
   fuzzTryFinallyStatement,
-  fuzzVariableDeclarationStatement,
-  fuzzWithStatement
+  fuzzVariableDeclarationStatement
 ];
 
 const loopFuzzers = [
@@ -428,6 +545,9 @@ const fuzzExpressionSuperProp = f =>
 const fuzzExpressionSuperCall = f =>
   f.allowSuperCall ? choose(fuzzExpression, fuzzSuper)(f) : fuzzExpression(f);
 
+const fuzzDirectives = f => {
+  return {directives: [], hasStrictDirective: false}; // todo
+}
 
 export const fuzzProgram =
   choose(fuzzModule, fuzzScript);
@@ -443,16 +563,21 @@ export const fuzzExpression = (f = new FuzzerState) => {
   if (f.allowNewTarget) {
     fuzzers = fuzzers.concat([fuzzNewTargetExpression]);
   }
+  f = f.clone(); // todo method
+  f.declKind = null;
 
   return choose(...fuzzers)(f);
 }
 
-export const fuzzStatement = (f = new FuzzerState) => {
+export const fuzzStatement = (f = new FuzzerState, {allowLoops = true, allowProperDeclarations = true, allowFunctionDeclarations = true}) => {
   if (f.tooDeep()) {
     return fuzzEmptyStatement(f); // todo all length-one options
   }
 
-  let fuzzers = simpleStmtFuzzers.concat(loopFuzzers); // [...simpleStmtFuzzers, ...loopFuzzers] is more elegant, but maybe slower
+  let fuzzers = [...simpleStmtFuzzers];
+  if (allowLoops) {
+    fuzzers.push(...loopFuzzers);
+  }
   
   if (f.allowReturn) {
     fuzzers.push(fuzzReturnStatement);
@@ -462,10 +587,14 @@ export const fuzzStatement = (f = new FuzzerState) => {
   } else if (f.allowBreak()) {
     fuzzers.push(fuzzBreakStatement);
   }
-  if (f.allowProperDeclarations) {
+  if (allowProperDeclarations) {
     fuzzers.push(fuzzClassDeclaration, fuzzFunctionDeclaration);
-  } else if (f.allowFunctionDeclarations) {
+  } else if (allowFunctionDeclarations) {
     fuzzers.push(fuzzFunctionDeclaration);
+  }
+
+  if (!f.strict) {
+    fuzzers.push(fuzzWithStatement);
   }
 
   let fuzzer = oneOf(...fuzzers)(f);
@@ -474,8 +603,12 @@ export const fuzzStatement = (f = new FuzzerState) => {
     f = f.enableMissingElse();
   }
 
-  if (fuzzer !== fuzzVariableDeclarationStatement && fuzzer !== fuzzFunctionDeclaration) {
-    f = f.enableDeclarations(); // those two need to know to avoid let and generators
+  if (fuzzer === fuzzVariableDeclarationStatement) {
+    return fuzzVariableDeclarationStatement(f, {allowProperDeclarations});
+  }
+
+  if (fuzzer === fuzzFunctionDeclaration) {
+    return fuzzFunctionDeclaration(f, {allowProperDeclarations});
   }
 
   return fuzzer(f);
