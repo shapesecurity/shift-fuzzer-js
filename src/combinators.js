@@ -16,7 +16,7 @@
 
 import FuzzerState from "./fuzzer-state";
 
-const MANY_BOUND = 5;
+export const MANY_BOUND = 5;
 
 export function manyN(bound) {
   return (fuzzer) =>

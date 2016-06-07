@@ -23,7 +23,7 @@ export default class FuzzerState {
 
     this.depth = 0;
     this.allowAwaitIdentifier = true; // false iff we fuzzing a module
-    this.inIteration = false; // allows continue and unlabelled break
+    this.inLoop = false; // allows continue and unlabelled break
     this.inSwitch = false; // allows unlabelled break // todo consider collapsing into one allowBreak, one allowContinue
     this.strict = false;
     this.allowReturn = false;
@@ -45,7 +45,7 @@ export default class FuzzerState {
     st.rng = this.rng;
     st.depth = this.depth;
     st.allowAwaitIdentifier = this.allowAwaitIdentifier;
-    st.inIteration = this.inIteration;
+    st.inLoop = this.inLoop;
     st.inSwitch = this.inSwitch;
     st.strict = this.strict;
     st.allowReturn = this.allowReturn;
@@ -72,7 +72,7 @@ export default class FuzzerState {
   }
 
   allowBreak() {
-    return this.inIteration || this.inSwitch || this.labels.length !== 0;
+    return this.inLoop || this.inSwitch || this.labels.length !== 0;
   }
 
   enableMissingElse() {
@@ -95,10 +95,9 @@ export default class FuzzerState {
 
   enterFunction({isGenerator = false, isArrow = false, isMethod = false, hasStrictDirective = false} = {}) {
     let st = this.clone();
-    if (st.allowMissingElse) throw 'missingelse'; // todo remove this assertion
-    if (st.declKind !== null) throw 'declKind';
+    if (st.declKind !== null) throw 'declKind'; // todo remove this
 
-    st.inIteration = false;
+    st.inLoop = false;
     st.inSwitch = false;
     if (hasStrictDirective) {
       st.strict = true;
@@ -120,9 +119,23 @@ export default class FuzzerState {
         st.allowSuperProp = false;
       }
     }
+    st.allowMissingElse = true;
 
     st.labels = [];
     st.loopLabels = [];
+
+    return st;
+  }
+
+  enterLoop() {
+    let st = this.clone();
+    st.inLoop = true;
+    return st;
+  }
+
+  enterSwitch() {
+    let st = this.clone();
+    st.inSwitch = true;
     return st;
   }
 }
