@@ -118,7 +118,7 @@ const fuzzCharacterClass = f => {
   if (f.tooDeep()) return '[]';
   f = f.goDeeper();
   let source = many(choose(fuzzCharacterClassCharacter, fuzzCharacterClassRange))(f).join('');
-  source = source.replace(/((\\\\)*)\\$/g, '$1\\a');
+  source = source.replace(/((^|[^\\])(\\\\)*)\\$/g, '$1\\a'); // character class cannot end in an odd number of backslashes
   return `[${oneOf('^', '-', '')(f)}${source}${oneOf('-', '')(f)}]`;
 };
 

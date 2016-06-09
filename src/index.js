@@ -102,7 +102,28 @@ export const fuzzIdentifier = (f = new FuzzerState, interestingNames = [], forbi
 
 const fuzzIdentifierName = choose(genIdentifierString, oneOf(...ALL_KNOWN_WORDS));
 
-const fuzzString = f => (f.rng.nextString(), 'placeholder'); // todo
+const fuzzHexDigit = oneOf(...'0123456789abcdefABCDEF');
+
+const fuzzString = f => f.rng.nextString();
+
+const toRawValue = (f, str) => {
+  // handle illegal escape sequences: 8, 9, trailing backslash, u, x, octals (in strict mode)
+  let orig;
+  do {
+    orig = str;
+    str = str.replace(/((^|[^\\])(\\\\)*\\)(8|9|u|x|$)/g, `$1\\$4`);
+    // str = str.replace(/((^|[^\\])(\\\\)*\\)u/g, `$1u${f.rng.nextBoolean() ?
+    //   `${fuzzHexDigit(f)}${fuzzHexDigit(f)}${fuzzHexDigit(f)}${fuzzHexDigit(f)}` :
+    //   `{${fuzzHexDigit(f)}${manyN(4)(fuzzHexDigit)(f).join('')}}`
+    // }`);
+    // str = str.replace(/((^|[^\\])(\\\\)*\\)x/g, `$1x${fuzzHexDigit(f)}${fuzzHexDigit(f)}`); // todo consider inserting escape sequences like \u{XXXXX} etc into strings. This technique works, but not in combination with our hack for dealing with the \u\u case.
+    if (f.strict) {
+      str = str.replace(/((^|[^\\])(\\\\)*\\)0([0-7])/g, `$1\\0$4`);
+      str = str.replace(/((^|[^\\])(\\\\)*\\)([1-7])/g, `$1\\$4`);
+    }
+  } while(str !== orig); // loop is to handle e.g. \8\8, because javascript lacks lookbehind and faking it is painful.
+  return str;
+}
 
 export const fuzzArrayAssignmentTarget = f =>
   ap(Shift.ArrayAssignmentTarget, {"elements": many(opt(choose(fuzzAssignmentTargetWithDefault, fuzzAssignmentTarget))), "rest": opt(fuzzAssignmentTarget)}, f);
@@ -225,8 +246,23 @@ export const fuzzDataProperty = f =>
 export const fuzzDebuggerStatement = f =>
   ap(Shift.DebuggerStatement, {}, f);
 
-export const fuzzDirective = (f = new FuzzerState) => {
-  let rawValue = f.rng.nextBoolean() ? 'use strict' : 'directive placeholder'; // todo
+export const fuzzDirective = (f = new FuzzerState, {allowUseStrict = true} = {}) => {
+  let rawValue = allowUseStrict && f.rng.nextBoolean() ? 'use strict' : fuzzString(f);
+  if (rawValue.match('"') && rawValue.match("'")) {
+    let toReplace = f.rng.nextBoolean() ? '"' : "'";
+    let regex = toReplace === '"' ? /((^|[^\\])(\\\\)*)"/g : /((^|[^\\])(\\\\)*)'/g; // Trust me, this was easier than generating them on the fly
+    let orig;
+    do {
+      orig = rawValue;
+      rawValue = rawValue.replace(regex, `$1\\${toReplace}`);
+      rawValue = rawValue.replace(/((^|[^\\])(\\\\)*\\)([\r\n])/g, `$1\\$4`);
+    } while (rawValue !== orig); // to handle e.g. '\"\"
+  }
+  rawValue = toRawValue(f, rawValue);
+  if (!allowUseStrict && rawValue === 'use strict') {
+    // This will almost never happen, but we should deal with it anyway.
+    rawValue = '';
+  }
   return new Shift.Directive({rawValue});
 }
 
@@ -406,7 +442,8 @@ export const fuzzModule = (f = new FuzzerState) => {
   f = f.clone();
   f.strict = true;
   f.allowAwaitIdenifier = false;
-  return ap(Shift.Module, {"directives": many(fuzzDirective), "items": many(choose(choose(fuzzExport, fuzzExportAllFrom, fuzzExportDefault, fuzzExportFrom, fuzzExportLocals), choose(fuzzImport, fuzzImportNamespace), fuzzStatement))}, f);
+
+  return ap(Shift.Module, {"directives": f => fuzzDirectives(f).directives, "items": many(choose(choose(fuzzExport, fuzzExportAllFrom, fuzzExportDefault, fuzzExportFrom, fuzzExportLocals), choose(fuzzImport, fuzzImportNamespace), fuzzStatement))}, f);
 }
 
 export const fuzzNewExpression = f =>
@@ -481,7 +518,12 @@ export const fuzzSwitchStatementWithDefault = f =>
   ap(Shift.SwitchStatementWithDefault, {"discriminant": fuzzExpression, "preDefaultCases": many(fuzzSwitchCase), "defaultCase": fuzzSwitchDefault, "postDefaultCases": many(fuzzSwitchCase)}, f.enterSwitch());
 
 export const fuzzTemplateElement = (f = new FuzzerState) => {
-  let rawValue = "template placeholder"; // todo
+  let rawValue = toRawValue(f, fuzzString(f));
+  let orig;
+  do {
+    orig = rawValue;
+    rawValue = rawValue.replace(/((^|[^\\])(\\\\)*)(`|\${)/g, '$1\\$4');
+  } while (rawValue !== orig);
   return new Shift.TemplateElement({rawValue});
 }
 
@@ -654,8 +696,17 @@ const fuzzClassElements = (f, {allowConstructor}) => {
 }
 
 const fuzzDirectives = f => {
-  let directives = many(fuzzDirective)(f);
-  return {directives, hasStrictDirective: directives.some(d => d.rawValue === 'use strict')};
+  f = f.clone();
+  let hasStrictDirective = f.rng.nextBoolean();
+  if (hasStrictDirective) {
+    f.strict = true;
+  }
+
+  let directives = many(f => fuzzDirective(f, {allowUseStrict: hasStrictDirective}))(f);
+  if (hasStrictDirective && !directives.some(d => d.rawValue === 'use strict')) {
+    directives.push(new Shift.Directive({rawValue: 'use strict'}));
+  }
+  return {directives, hasStrictDirective};
 }
 
 const fuzzAssignmentTarget = f => {
@@ -744,4 +795,4 @@ export const fuzzStatement = (f = new FuzzerState, {allowLoops = true, allowProp
   }
 
   return fuzzer(f);
-};
+}
