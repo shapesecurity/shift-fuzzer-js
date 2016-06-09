@@ -17,9 +17,9 @@
 import * as Shift from "shift-ast/checked";
 
 import FuzzerState from "./fuzzer-state";
-export {FuzzerState};
+export { FuzzerState };
 import { ap, choose, guardDepth, many, many1, manyN, oneOf, opt, MANY_BOUND } from "./combinators";
-
+import fuzzRegExpPattern from "./regexp";
 
 
 const RESERVED =  [ // todo import this
@@ -103,8 +103,6 @@ export const fuzzIdentifier = (f = new FuzzerState, interestingNames = [], forbi
 const fuzzIdentifierName = choose(genIdentifierString, oneOf(...ALL_KNOWN_WORDS));
 
 const fuzzString = f => (f.rng.nextString(), 'placeholder'); // todo
-
-const fuzzRegExpPattern = f => 'a regex'; // todo
 
 export const fuzzArrayAssignmentTarget = f =>
   ap(Shift.ArrayAssignmentTarget, {"elements": many(opt(choose(fuzzAssignmentTargetWithDefault, fuzzAssignmentTarget))), "rest": opt(fuzzAssignmentTarget)}, f);
