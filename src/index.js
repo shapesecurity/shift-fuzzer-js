@@ -255,9 +255,13 @@ export const fuzzDirective = (f = new FuzzerState, {allowUseStrict = true} = {})
     do {
       orig = rawValue;
       rawValue = rawValue.replace(regex, `$1\\${toReplace}`);
-      rawValue = rawValue.replace(/((^|[^\\])(\\\\)*\\)([\r\n])/g, `$1\\$4`);
     } while (rawValue !== orig); // to handle e.g. '\"\"
   }
+  let orig;
+  do {
+    orig = rawValue;
+    rawValue = rawValue.replace(/((^|[^\\])(\\\\)*)([\r\n])/g, `$1\\$4`);
+  } while (rawValue !== orig); // to handle e.g. \n\n
   rawValue = toRawValue(f, rawValue);
   if (!allowUseStrict && rawValue === 'use strict') {
     // This will almost never happen, but we should deal with it anyway.
@@ -368,7 +372,7 @@ export const fuzzIdentifierExpression = f =>
 export const fuzzIfStatement = (f = new FuzzerState) => {
   f = f.goDeeper();
   let test = fuzzExpression(f);
-  let alternate = f.allowMissingElse && f.rng.nextBoolean() ? fuzzStatement(f, {allowProperDeclarations: false, allowFunctionDeclarations: !f.strict, allowLabeledFunctionDeclarations: false}) : null;
+  let alternate = !f.allowMissingElse || f.rng.nextBoolean() ? fuzzStatement(f, {allowProperDeclarations: false, allowFunctionDeclarations: !f.strict, allowLabeledFunctionDeclarations: false}) : null;
   if (alternate) {
     f.allowMissingElse = false;
   }
@@ -523,6 +527,7 @@ export const fuzzTemplateElement = (f = new FuzzerState) => {
   do {
     orig = rawValue;
     rawValue = rawValue.replace(/((^|[^\\])(\\\\)*)(`|\${)/g, '$1\\$4');
+    rawValue = rawValue.replace(/((^|[^\\])(\\\\)*\\)(0(?=[0-7])|[1-7])/g, '$1\\$4');
   } while (rawValue !== orig);
   return new Shift.TemplateElement({rawValue});
 }

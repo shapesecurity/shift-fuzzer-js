@@ -10,6 +10,7 @@ suite("unit", () => {
     for (let i = 0; i < 1e3; ++i) {
       let ident = fuzzIdentifier();
       try {
+        if (ident === 'enum') continue;
         assert(isIdentifierNameES6(ident));
         assert(isIdentifierES6(ident));
       } catch(e) {
