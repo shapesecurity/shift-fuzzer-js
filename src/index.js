@@ -561,7 +561,7 @@ export const fuzzTryFinallyStatement = f =>
 export const fuzzUnaryExpression = (f = new FuzzerState) => {
   f = f.goDeeper();
   let operator = oneOf("+", "-", "!", "~", "typeof", "void", "delete")(f);
-  let operand = fuzzExpression(f, {allowIdentfierExpression: operator !== "delete" || !f.strict});
+  let operand = fuzzExpression(f, {allowIdentifierExpression: operator !== "delete" || !f.strict});
   return new Shift.UnaryExpression({operator, operand});
 }
 
@@ -735,9 +735,9 @@ export const fuzzProgram =
 
 export {fuzzProgram as default};
 
-export const fuzzExpression = (f = new FuzzerState, {allowIdentfierExpression = true} = {}) => {
+export const fuzzExpression = (f = new FuzzerState, {allowIdentifierExpression = true} = {}) => {
   if (f.tooDeep()) {
-    return fuzzLiteralNullExpression(f); // todo all length-one options
+    return fuzzLeafExpression(f, {allowIdentifierExpression});
   }
   let fuzzers = simpleExprFuzzers;
   if (f.allowYieldExpr) {
@@ -746,7 +746,7 @@ export const fuzzExpression = (f = new FuzzerState, {allowIdentfierExpression = 
   if (f.allowNewTarget) {
     fuzzers = fuzzers.concat([fuzzNewTargetExpression]);
   }
-  if (allowIdentfierExpression) {
+  if (allowIdentifierExpression) {
     fuzzers = fuzzers.concat([fuzzIdentifierExpression]);
   }
   f = f.clone();
@@ -755,9 +755,25 @@ export const fuzzExpression = (f = new FuzzerState, {allowIdentfierExpression = 
   return choose(...fuzzers)(f);
 }
 
+const fuzzLeafExpression = (f, {allowIdentifierExpression}) => {
+  let fuzzers = [
+    fuzzLiteralBooleanExpression,
+    fuzzLiteralInfinityExpression,
+    fuzzLiteralNullExpression,
+    fuzzLiteralNumericExpression,
+    fuzzLiteralRegExpExpression,
+    fuzzLiteralStringExpression,
+    fuzzThisExpression,
+  ];
+  if (allowIdentifierExpression) fuzzers.push(fuzzIdentifierExpression);
+  if (f.allowNewTarget) fuzzers.push(fuzzNewTargetExpression);
+  if (f.allowYieldExpr) fuzzers.push(fuzzYieldExpression);
+  return choose(...fuzzers)(f);
+};
+
 export const fuzzStatement = (f = new FuzzerState, {allowLoops = true, allowProperDeclarations = true, allowFunctionDeclarations = true, allowLabeledFunctionDeclarations = !f.strict && allowFunctionDeclarations} = {}) => {
   if (f.tooDeep()) {
-    return fuzzEmptyStatement(f); // todo all length-one options
+    return fuzzLeafStatement(f);
   }
 
   let fuzzers = [...simpleStmtFuzzers];
@@ -802,4 +818,12 @@ export const fuzzStatement = (f = new FuzzerState, {allowLoops = true, allowProp
   }
 
   return fuzzer(f);
+}
+
+const fuzzLeafStatement = (f) => {
+  let fuzzers = [fuzzDebuggerStatement, fuzzEmptyStatement];
+  if (f.allowBreak()) fuzzers.push(fuzzBreakStatement);
+  if (f.inLoop) fuzzers.push(fuzzContinueStatement);
+  if (f.allowReturn) fuzzers.push(fuzzReturnStatement);
+  return choose(...fuzzers)(f);
 }
