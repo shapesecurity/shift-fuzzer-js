@@ -13,7 +13,7 @@
     "dist"
   ],
   "scripts": {
-    "test": "mocha --compilers js:babel-register --inline-diffs --check-leaks --timeout 5000 --slow 4000 --ui tdd --reporter dot --recursive test",
+    "test": "mocha --compilers js:babel-register --inline-diffs --check-leaks --timeout 60000 --slow 30000 --ui tdd --reporter dot --recursive test",
     "build": "babel --modules commonStrict --source-maps-inline --out-dir dist src",
     "prepublish": "rm -rf dist/* && npm update && npm run build"
   },
