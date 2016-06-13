@@ -7,7 +7,7 @@ import fuzzProgram, {FuzzerState, fuzzIdentifier, fuzzWhileStatement} from "../"
 
 suite("unit", () => {
   testRepeatedly("fuzzIdentifier produces a valid Identifier (not IdentifierName)", () => {
-    for (let i = 0; i < 1e3; ++i) {
+    for (let i = 0; i < 30e3; ++i) {
       let ident = fuzzIdentifier();
       try {
         if (ident === 'enum') continue;
