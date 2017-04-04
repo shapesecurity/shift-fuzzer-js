@@ -22,8 +22,6 @@ import { ap, choose, guardDepth, many, many1, manyN, oneOf, opt, MANY_BOUND } fr
 import fuzzRegExpPattern from "./regexp";
 
 
-require('array.from').shim(); // node 0.12 hack.
-
 const RESERVED =  [ // todo import this
   // keywords
   'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger',
