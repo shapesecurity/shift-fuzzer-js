@@ -5,6 +5,5 @@ script:
   - npm run build
   - npm test
 node_js:
-  - "0.12"
   - "4"
   - "6"
