@@ -31,11 +31,13 @@ const RESERVED =  [ // todo import this
   'with',
   // null, booleans
   'null', 'true', 'false',
+  // future reserved word
+  'enum',
 ];
 
 const STRICT_FORBIDDEN = [
   'implements', 'package', 'protected', 'interface', 'private', 'public',
-  'static', 'enum'
+  'static'
 ];
 
 const ALL_KNOWN_WORDS = RESERVED.concat(STRICT_FORBIDDEN).concat(['let', 'yield', 'await', 'eval', 'arguments', 'constructor', 'prototype']);
