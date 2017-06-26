@@ -2,7 +2,7 @@
   "name": "shift-fuzzer",
   "version": "1.0.2",
   "description": "generate random valid Shift format ASTs",
-  "author": "Shape Security Labs",
+  "author": "Shape Security",
   "homepage": "https://github.com/shapesecurity/shift-fuzzer-js",
   "repository": {
     "type": "git",
