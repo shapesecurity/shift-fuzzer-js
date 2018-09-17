@@ -500,11 +500,25 @@ export const fuzzStaticMemberAssignmentTarget = f =>
 export const fuzzStaticMemberExpression = f =>
   ap(Shift.StaticMemberExpression, {"object": fuzzExpressionSuperProp, "property": fuzzIdentifierName}, f);
 
-export const fuzzStaticPropertyName = (f = new FuzzerState, {allowConstructor = true, allowPrototype = true} = {}) => { // todo avoid duplicate __proto__ simple properties
+export const fuzzStaticPropertyName = (f = new FuzzerState, {allowConstructor = true, allowPrototype = true} = {}) => {
+
+  let interestingNames = ['__proto__'];
+  if (allowConstructor) {
+    interestingNames.push('constructor');
+  }
+  if (allowPrototype) {
+    interestingNames.push('prototype');
+  }
+
   let value;
-  do {
-    value = fuzzString(f);
-  } while (!allowConstructor && value === 'constructor' || !allowPrototype && value === 'prototype');
+  if (f.rng.nextBoolean()) {
+    value = interestingNames[f.rng.nextInt(interestingNames.length)];
+  } else {
+    do {
+      value = fuzzString(f);
+    } while (!allowConstructor && value === 'constructor' || !allowPrototype && value === 'prototype');
+  }
+
   return new Shift.StaticPropertyName({value});
 }
 
