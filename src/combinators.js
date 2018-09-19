@@ -90,3 +90,25 @@ export function guardDepth(fuzzerA, fuzzerB) {
     fuzzerState.tooDeep() ? fuzzerA(fuzzerState) : fuzzerB(fuzzerState);
 }
 
+export function guardDuplicatedProto(fuzzer) {
+  return (fuzzerState = new FuzzerState) => {
+    let fuzzed = many(fuzzer)(fuzzerState);
+    if (!Array.isArray(fuzzed)) {
+      throw new Error('fuzzed was not an array');
+    }
+    let hasProto = false;
+    fuzzed = fuzzed.map(fuzzedProperty => {
+      while ((fuzzedProperty.type === 'ShorthandProperty' && fuzzedProperty.name.type === 'IdentifierExpression' && fuzzedProperty.name.name === '__proto__') || ('name' in fuzzedProperty && fuzzedProperty.name.type === 'StaticPropertyName' && fuzzedProperty.name.value === '__proto__')) {
+        if (hasProto) {
+          fuzzedProperty = fuzzer(fuzzerState);
+        } else {
+          hasProto = true;
+          break;
+        }
+      } // computed properties are not handled
+      return fuzzedProperty;
+    });
+    return fuzzed;
+  }
+}
+

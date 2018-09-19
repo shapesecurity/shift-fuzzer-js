@@ -18,7 +18,7 @@ import * as Shift from "shift-ast/checked";
 
 import FuzzerState from "./fuzzer-state";
 export { FuzzerState };
-import { ap, choose, guardDepth, many, many1, manyN, oneOf, opt, MANY_BOUND } from "./combinators";
+import { ap, choose, guardDepth, guardDuplicatedProto, many, many1, manyN, oneOf, opt, MANY_BOUND } from "./combinators";
 import fuzzRegExpPattern from "./regexp";
 
 
@@ -464,8 +464,7 @@ export const fuzzObjectAssignmentTarget = f =>
 export const fuzzObjectBinding = f =>
   ap(Shift.ObjectBinding, {"properties": many(choose(fuzzBindingPropertyIdentifier, fuzzBindingPropertyProperty))}, f);
 
-export const fuzzObjectExpression = f =>
-  ap(Shift.ObjectExpression, {"properties": many(choose(choose(fuzzDataProperty, choose(fuzzGetter, fuzzMethod, fuzzSetter)), fuzzShorthandProperty))}, f);
+export const fuzzObjectExpression = f => ap(Shift.ObjectExpression, {"properties": guardDuplicatedProto(choose(choose(fuzzDataProperty, choose(fuzzGetter, fuzzMethod, fuzzSetter)), fuzzShorthandProperty))}, f);
 
 export const fuzzReturnStatement = f =>
   ap(Shift.ReturnStatement, {"expression": opt(fuzzExpression)}, f);
@@ -500,11 +499,13 @@ export const fuzzStaticMemberAssignmentTarget = f =>
 export const fuzzStaticMemberExpression = f =>
   ap(Shift.StaticMemberExpression, {"object": fuzzExpressionSuperProp, "property": fuzzIdentifierName}, f);
 
-export const fuzzStaticPropertyName = (f = new FuzzerState, {allowConstructor = true, allowPrototype = true} = {}) => { // todo avoid duplicate __proto__ simple properties
+export const fuzzStaticPropertyName = (f = new FuzzerState, {allowConstructor = true, allowPrototype = true} = {}) => {
+
   let value;
   do {
     value = fuzzString(f);
   } while (!allowConstructor && value === 'constructor' || !allowPrototype && value === 'prototype');
+
   return new Shift.StaticPropertyName({value});
 }
 
