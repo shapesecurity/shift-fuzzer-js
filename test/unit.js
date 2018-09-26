@@ -4,6 +4,9 @@ const {keyword: {isIdentifierES6, isIdentifierNameES6}} = esutils;
 
 import {testRepeatedly, prng} from "./helpers";
 import fuzzProgram, {FuzzerState, fuzzIdentifier, fuzzWhileStatement} from "../";
+import { ap, guardDuplicatedProto } from "../dist/combinators";
+import { choose } from "../src/combinators";
+import * as Shift from "shift-ast/checked";
 
 suite("unit", () => {
   testRepeatedly("fuzzIdentifier produces a valid Identifier (not IdentifierName)", () => {
@@ -58,5 +61,22 @@ suite("unit", () => {
         throw e;
       }
     }
+  });
+
+  testRepeatedly("object cannot have multiple __proto__ elements", () => {
+    const fuzzProto = (f) => ap(Shift.ShorthandProperty, {name: f => ap(Shift.IdentifierExpression, {name: (f) => '__proto__'}, f)}, f);
+    const fuzzNotProto = (f) => ap(Shift.ShorthandProperty, {name: f => ap(Shift.IdentifierExpression, {name: (f) => 'notProto'}, f)}, f);
+    const fuzzManyProtos = choose(fuzzProto, fuzzNotProto);
+    let fuzzerState = new FuzzerState();
+    let objectExpression = ap(Shift.ObjectExpression, {properties: guardDuplicatedProto(fuzzManyProtos)}, fuzzerState);
+    let protoCount = 0;
+    for (let property of objectExpression.properties) {
+      assert.equal('ShorthandProperty', property.type);
+      assert.equal('IdentifierExpression', property.name.type);
+      if (property.name.name === '__proto__') {
+        protoCount++;
+      }
+    }
+    assert(protoCount < 2, "more than 1 __proto__ in object");
   });
 });
