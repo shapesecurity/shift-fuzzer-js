@@ -502,7 +502,7 @@ export const fuzzStaticMemberExpression = f =>
 
 export const fuzzStaticPropertyName = (f = new FuzzerState, {allowConstructor = true, allowPrototype = true} = {}) => {
 
-  let interestingNames = ['__proto__'];
+  let interestingNames = ['__proto__', 'get', 'set', 'public', 'private', 'class', 'function', 'static', 'let', 'var', 'const', 'if', 'do', 'while', 'for', 'with', 'export', 'import'];
   if (allowConstructor) {
     interestingNames.push('constructor');
   }
