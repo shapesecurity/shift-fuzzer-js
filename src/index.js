@@ -56,7 +56,7 @@ const MAX_IDENT_LENGTH = 15;
 const genIdentifierString = f => identifierStart(f) + manyN(MAX_IDENT_LENGTH)(identifierPart)(f).join("");
 
 const fuzzVariableName = (f, isBinding) => {
-  let interestingNames = [];
+  let interestingNames = ['async'];
   let forbiddenNames = [...RESERVED];
   if (f.strict) {
     forbiddenNames.push(...STRICT_FORBIDDEN, 'let', 'yield');
@@ -66,13 +66,13 @@ const fuzzVariableName = (f, isBinding) => {
     (!f.allowYieldIdentifier ? forbiddenNames : interestingNames).push('yield');
   }
   (f.strict && isBinding ? forbiddenNames : interestingNames).push('eval', 'arguments');
-  (!f.allowAwaitIdenifier ? forbiddenNames : interestingNames).push('await'); // this has the odd effect that strict-mode scripts have lots of variables named await.
+  (!f.allowAwaitIdentifier ? forbiddenNames : interestingNames).push('await'); // this has the odd effect that strict-mode scripts have lots of variables named await.
 
   return fuzzIdentifier(f, interestingNames, forbiddenNames);
 }
 
 const fuzzLabel = f => { // todo consider collapsing into fuzzVariableName(f, false);
-  let interestingNames = ['eval', 'arguments'];
+  let interestingNames = ['eval', 'arguments', 'async'];
   let forbiddenNames = [...RESERVED, ...f.labels];
   if (f.strict) {
     forbiddenNames.push(...STRICT_FORBIDDEN, 'let', 'yield');
@@ -80,7 +80,7 @@ const fuzzLabel = f => { // todo consider collapsing into fuzzVariableName(f, fa
     interestingNames.push(...STRICT_FORBIDDEN, 'let');
     (!f.allowYieldIdentifier ? forbiddenNames : interestingNames).push('yield');
   }
-  (!f.allowAwaitIdenifier ? forbiddenNames : interestingNames).push('await');
+  (!f.allowAwaitIdentifier ? forbiddenNames : interestingNames).push('await');
 
   f.labels.forEach(l => {
     let ind = interestingNames.indexOf(l);
@@ -140,17 +140,21 @@ export const fuzzArrayExpression = f =>
 export const fuzzArrowExpression = (f = new FuzzerState) => {
   let isConsise = f.rng.nextBoolean();
   let params, body;
+  let isAsync = f.rng.nextBoolean();
+  if (isAsync) {
+    f.allowAwaitIdentifier = false;
+  }
   if (!isConsise) {
     let {directives, hasStrictDirective} = fuzzDirectives(f);
     f = f.enterFunction({isArrow: true, hasStrictDirective});
     params = fuzzFormalParameters(f, {hasStrictDirective});
     body = new Shift.FunctionBody({directives, statements: many(fuzzStatement)(f.goDeeper())});
   } else {
-    f = f.enterFunction({isArrow: true});
+    f = f.enterFunction({isArrow: true, isAsync});
     params = fuzzFormalParameters(f);
     body = fuzzExpression(f);
   }
-  return new Shift.ArrowExpression({params, body});
+  return new Shift.ArrowExpression({isAsync, params, body});
 }
 
 export const fuzzAssignmentExpression = f =>
@@ -326,7 +330,7 @@ export const fuzzFormalParameters = (f = new FuzzerState, {hasStrictDirective = 
   if (hasStrictDirective) {
     return new Shift.FormalParameters({items: many(fuzzBindingIdentifier)(f), rest: null}); // note that f.strict should be set by the callee in this case
   }
-  f = f.goDeeper().disableYieldExpr();
+  f = f.goDeeper().disableYieldExpr().disableAwaitExpr();
   let items = many(choose(fuzzBindingWithDefault, fuzzBinding))(f);
   let rest = opt(fuzzBinding)(f);
   return new Shift.FormalParameters({items, rest});
@@ -337,26 +341,43 @@ export const fuzzFunctionBody = f =>
 
 export const fuzzFunctionDeclaration = (f = new FuzzerState, {allowProperDeclarations = true} = {}) => {
   let {directives, hasStrictDirective} = fuzzDirectives(f);
-  let isGenerator = allowProperDeclarations && f.rng.nextBoolean();
+  let isGenerator = false;
+  let isAsync = false;
+  if (allowProperDeclarations) {
+    let type = f.rng.nextDouble();
+    if (type < (1 / 3)) {
+      isGenerator = true;
+      f.allowYieldIdentifier = false;
+    } else if (type < (2 / 3)) {
+      isAsync = true;
+      f.allowAwaitIdentifier = false;
+    }
+  }
   let name = fuzzBindingIdentifier(f);
   f = f.enterFunction({isGenerator, hasStrictDirective})
   let params = fuzzFormalParameters(f, {hasStrictDirective});
   let body = new Shift.FunctionBody({directives, statements: many(fuzzStatement)(f.goDeeper())});
-  return new Shift.FunctionDeclaration({isGenerator, name, params, body});
+  return new Shift.FunctionDeclaration({isGenerator, isAsync, name, params, body});
 }
 
 export const fuzzFunctionExpression = (f = new FuzzerState) => {
   f = f.clone();
   let {directives, hasStrictDirective} = fuzzDirectives(f);
-  let isGenerator = f.rng.nextBoolean();
-  if (isGenerator) {
+  let isGenerator = false;
+  let isAsync = false;
+  let type = f.rng.nextDouble();
+  if (type < (1 / 3)) {
+    isGenerator = true;
     f.allowYieldIdentifier = false;
+  } else if (type < (2 / 3)) {
+    isAsync = true;
+    f.allowAwaitIdentifier = false;
   }
   let name = f.rng.nextBoolean() ? fuzzBindingIdentifier(f) : null;
-  f = f.enterFunction({isGenerator, hasStrictDirective})
+  f = f.enterFunction({isGenerator, isAsync, hasStrictDirective})
   let params = fuzzFormalParameters(f, {hasStrictDirective});
   let body = new Shift.FunctionBody({directives, statements: many(fuzzStatement)(f.goDeeper())});
-  return new Shift.FunctionExpression({isGenerator, name, params, body});
+  return new Shift.FunctionExpression({isGenerator, isAsync, name, params, body});
 }
 
 export const fuzzGetter = (f = new FuzzerState, {isStatic = false, inClass = false} = {}) => {
@@ -437,20 +458,32 @@ export const fuzzMethod = (f = new FuzzerState, {isStatic = false, inClass = fal
   f = f.goDeeper();
   let {directives, hasStrictDirective} = fuzzDirectives(f);
   let isConstructor = inClass && allowConstructor && !isStatic && f.rng.nextBoolean();
-  let isGenerator = !isConstructor && f.rng.nextBoolean();
+  let isGenerator = false;
+  let isAsync = false;
+  if (!isConstructor) {
+    let type = f.rng.nextDouble();
+    if (type < (1 / 3)) {
+      isGenerator = true;
+      f.allowYieldIdentifier = false;
+    } else if (type < (2 / 3)) {
+      isAsync = true;
+      f.allowAwaitIdentifier = false;
+    }
+  }
   let name = isConstructor ? new Shift.StaticPropertyName({value: "constructor"}) : choose(fuzzComputedPropertyName, f => fuzzStaticPropertyName(f, {allowConstructor: !inClass, allowPrototype: !isStatic}))(f);
-  f = f.enterFunction({isMethod: true, isGenerator, hasStrictDirective});
+  f = f.enterFunction({isMethod: true, isAsync, isGenerator, hasStrictDirective});
   f.allowSuperCall = isConstructor && constructorMayContainSuperCall;
   f.allowSuperProp = true;
   let params = fuzzFormalParameters(f, {hasStrictDirective});
   let body = new Shift.FunctionBody({directives, statements: many(fuzzStatement)(f.goDeeper())});
-  return new Shift.Method({isGenerator, name, params, body});
+  return new Shift.Method({isGenerator, isAsync, name, params, body});
 }
 
 export const fuzzModule = (f = new FuzzerState) => {
   f = f.clone();
   f.strict = true;
-  f.allowAwaitIdenifier = false;
+  f.allowAwaitIdentifier = false;
+  f.isModule = true;
 
   return ap(Shift.Module, {"directives": f => fuzzDirectives(f).directives, "items": many(choose(choose(fuzzExport, fuzzExportAllFrom, fuzzExportDefault, fuzzExportFrom, fuzzExportLocals), choose(fuzzImport, fuzzImportNamespace), fuzzStatement))}, f);
 }
@@ -613,6 +646,9 @@ export const fuzzWithStatement = f =>
 export const fuzzYieldExpression = f =>
   ap(Shift.YieldExpression, {"expression": opt(fuzzExpression)}, f);
 
+export const fuzzAwaitExpression = f =>
+  ap(Shift.AwaitExpression, {"expression": fuzzExpression}, f);
+
 export const fuzzYieldGeneratorExpression = f =>
   ap(Shift.YieldGeneratorExpression, {"expression": fuzzExpression}, f);
 
@@ -745,6 +781,9 @@ export const fuzzExpression = (f = new FuzzerState, {allowIdentifierExpression =
   let fuzzers = simpleExprFuzzers;
   if (f.allowYieldExpr) {
     fuzzers = fuzzers.concat(yieldExprFuzzers);
+  }
+  if (f.allowAwaitExpr) {
+    fuzzers = fuzzers.concat(fuzzAwaitExpression);
   }
   if (f.allowNewTarget) {
     fuzzers = fuzzers.concat([fuzzNewTargetExpression]);
