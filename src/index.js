@@ -425,7 +425,7 @@ export const fuzzLiteralNumericExpression = f =>
     f => 0
   )}, f);
 
-export const fuzzLiteralRegExpExpression = (f, canFuzzUnicode = false, bugAvoidance = new RegExpBugAvoidanceConfiguration({namedGroups: false, lookbehinds: false})) => {
+export const fuzzLiteralRegExpExpression = (f, canFuzzUnicode = false, bugAvoidance = new RegExpBugAvoidanceConfiguration({ lookbehinds: false })) => {
   let isUnicode = canFuzzUnicode;
   return ap(Shift.LiteralRegExpExpression, {"pattern": f => fuzzRegExpPattern(f, isUnicode = isUnicode && f.rng.nextBoolean(), bugAvoidance).replace(/\//g, '\\$0'), "global": f => f.rng.nextBoolean(), "ignoreCase": f => f.rng.nextBoolean(), "multiLine": f => f.rng.nextBoolean(), "sticky": f => f.rng.nextBoolean(), "unicode": f => isUnicode}, f);
 }

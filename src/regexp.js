@@ -2,9 +2,9 @@ import Random from "./random";
 import { choose, many, oneOf } from "./combinators";
 import {IDENTIFIER_START, IDENTIFIER_CONTINUE} from "./unicode";
 
-function testRegex(regex, flags = '', constructor = RegExp) {
+function testRegExp(regexp, flags = '', constructor = RegExp) {
   try {
-    return constructor(regex, flags);
+    return constructor(regexp, flags);
   } catch (e) {
     return false;
   }
@@ -16,7 +16,7 @@ export class RegExpBugAvoidanceConfiguration {
   }
 
   static fromEngine(constructor = RegExp) {
-    return new RegExpBugAvoidanceConfiguration({ lookbehinds: !!testRegex('(?<=)(?<!)', '', constructor) });
+    return new RegExpBugAvoidanceConfiguration({ lookbehinds: !!testRegExp('(?<=)(?<!)', '', constructor) });
   }
 }
 
@@ -394,8 +394,8 @@ const fuzzDisjunction = f => {
   return choose(fuzzAlternative, fuzzManyDisjunctions)(f);
 };
 
-export function engineSupportsRegexUnicode() {
-  let regexp = testRegex('()', 'u');
+export function engineSupportsRegExpUnicode() {
+  let regexp = testRegExp('()', 'u');
   return !!regexp && !!regexp.unicode;
 }
 

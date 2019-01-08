@@ -25,7 +25,7 @@ suite("integration", () => {
     }
   });
 
-  const flagsFromRegex = (expression) => {
+  const flagsFromRegexp = (expression) => {
     return [
       expression.global ? 'g' : '',
       expression.ignoreCase ? 'i' : '',
@@ -38,18 +38,18 @@ suite("integration", () => {
   // covered in other tests, but more is better
   testRepeatedly("fuzzLiteralRegExpExpression round trips through our codegen and parser", () => {
     let expression = fuzzLiteralRegExpExpression();
-    let flags = flagsFromRegex(expression);
+    let flags = flagsFromRegexp(expression);
     let roundTripped;
     try{
       roundTripped = parseScript(codegen(expression)).statements[0].expression;
     } catch (e) {
-      throw new Error(`failed to parse regex: expected: /${expression.pattern}/${flags} got error: ${e}`);
+      throw new Error(`failed to parse regexp: expected: /${expression.pattern}/${flags} got error: ${e}`);
     }
     try {
       expect(roundTripped).to.be.eql(expression);
     } catch (e) {
-      let otherFlags = flagsFromRegex(roundTripped);
-      throw new Error(`regex not equal in parse and codegen: expected: /${expression.pattern}/${flags} got: /${roundTripped.pattern}/${otherFlags}`);
+      let otherFlags = flagsFromRegexp(roundTripped);
+      throw new Error(`regexp not equal in parse and codegen: expected: /${expression.pattern}/${flags} got: /${roundTripped.pattern}/${otherFlags}`);
     }
   });
 
