@@ -323,7 +323,7 @@ const fuzzCharacterClass = f => {
 };
 
 const illegalRangeItems = ['\\c'];
-const illegalRangeItemsUnicode = ['\\d', '\\D', '\\w', '\\W', '\\s', '\\S', '\\c', '\\p', '\\P'];
+const illegalRangeItemsUnicode = ['\\d', '\\D', '\\w', '\\W', '\\s', '\\S', '\\c'];
 
 const fuzzCharacterClassRange = canDash => f => {
   let toCheckItems = illegalRangeItems;
