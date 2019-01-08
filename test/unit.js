@@ -4,7 +4,7 @@ const {keyword: {isIdentifierES6, isIdentifierNameES6}} = esutils;
 
 import { testRepeatedly, prng } from "./helpers";
 import fuzzProgram, { FuzzerState, fuzzIdentifier, fuzzWhileStatement, fuzzLiteralRegExpExpression } from "../";
-import fuzzRegExpPattern, { engineSupportsRegexUnicode, RegExpBugAvoidanceConfiguration } from "../src/regexp";
+import fuzzRegExpPattern, { engineSupportsRegExpUnicode, RegExpBugAvoidanceConfiguration } from "../src/regexp";
 
 suite("unit", () => {
   testRepeatedly("fuzzIdentifier produces a valid Identifier (not IdentifierName)", () => {
@@ -34,8 +34,8 @@ suite("unit", () => {
     assert.deepEqual(programA, programB);
   });
   
-  testRepeatedly("fuzzRegExpPattern generates valid regex", () => {
-    let expression = fuzzRegExpPattern(new FuzzerState(), engineSupportsRegexUnicode(), RegExpBugAvoidanceConfiguration.fromEngine());
+  testRepeatedly("fuzzRegExpPattern generates valid regexp", () => {
+    let expression = fuzzRegExpPattern(new FuzzerState(), engineSupportsRegExpUnicode(), RegExpBugAvoidanceConfiguration.fromEngine());
     let flags = [
       expression.global ? 'g' : '',
       expression.ignoreCase ? 'i' : '',
@@ -46,7 +46,7 @@ suite("unit", () => {
     try {
       RegExp(expression.pattern, flags);
     } catch (e) {
-      throw new Error(`regex failed: /${expression.pattern}/${flags} error: ${e}`);
+      throw new Error(`regexp failed: /${expression.pattern}/${flags} error: ${e}`);
     }
   });
 

@@ -2,9 +2,9 @@ import Random from "./random";
 import { choose, many, oneOf } from "./combinators";
 import {IDENTIFIER_START, IDENTIFIER_CONTINUE} from "./unicode";
 
-function testRegex(regex, flags = '', constructor = RegExp) {
+function testRegExp(regexp, flags = '', constructor = RegExp) {
   try {
-    return constructor(regex, flags);
+    return constructor(regexp, flags);
   } catch (e) {
     return false;
   }
@@ -20,7 +20,7 @@ export class RegExpBugAvoidanceConfiguration {
   }
 
   static fromEngine(constructor = RegExp) {
-    return new RegExpBugAvoidanceConfiguration({namedGroups: !!testRegex('(?<t>)', '', constructor), lookbehinds: !!testRegex('(?<=)(?<!)', '', constructor), unicodeProperties: !!testRegex('\\p{ASCII}', 'u', constructor), loneUnicodePropertiesBroken: defaultBrokenLoneUnicodeValues(constructor)});
+    return new RegExpBugAvoidanceConfiguration({namedGroups: !!testRegExp('(?<t>)', '', constructor), lookbehinds: !!testRegExp('(?<=)(?<!)', '', constructor), unicodeProperties: !!testRegExp('\\p{ASCII}', 'u', constructor), loneUnicodePropertiesBroken: defaultBrokenLoneUnicodeValues(constructor)});
   }
 }
 
@@ -140,7 +140,7 @@ const utf16LonePropertyValuesRaw = ['ASCII', 'ASCII_Hex_Digit', 'AHex', 'Alphabe
 let defaultBrokenLoneUnicodeValuesCached;
 let defaultBrokenLoneUnicodeValuesCachedConstructor;
 
-const defaultBrokenLoneUnicodeValuesCalculate = () => !testRegex('\\p{ASCII}', 'u') ? [] : utf16LonePropertyValuesRaw.filter(value => !testRegex(`/\\p{${value}}`, 'u'));
+const defaultBrokenLoneUnicodeValuesCalculate = () => !testRegExp('\\p{ASCII}', 'u') ? [] : utf16LonePropertyValuesRaw.filter(value => !testRegExp(`/\\p{${value}}`, 'u'));
 
 const defaultBrokenLoneUnicodeValues = (constructor) => {
   if (defaultBrokenLoneUnicodeValuesCachedConstructor !== constructor) {
@@ -202,7 +202,7 @@ const occupiedEscapes = ['d', 'D', 's', 'S', 'w', 'W', 'p', 'P', 'f', 'n', 'r', 
 const fuzzDecimalEscape = state => {
   let nParens = state.globalState.groupSpecifiersToDefine.length + state.globalState.definedGroupSpecifiers.length;
   if (nParens === 0) {
-    state.globalState.groupSpecifiersToDefine.push(fuzzRegexIdentifierWithValue(state));
+    state.globalState.groupSpecifiersToDefine.push(fuzzRegExpIdentifierWithValue(state));
     nParens++;
   }
   return `\\${state.rng.nextInt(nParens) + 1}`
@@ -297,44 +297,44 @@ const fuzzCodePointIdentifierStart = f => fuzzCodePoint(f.unicode ? IDENTIFIER_S
 
 const fuzzSpecialIdentifierContinueCharacter = f => oneOf('\u200C', '\u200D')(f); // ZWNJ / ZWJ
 
-const fuzzRegexIdentifier = state => {
+const fuzzRegExpIdentifier = state => {
   return `${choose(f => oneOf('$', '_')(f), fuzzCodePointIdentifierStart, fuzzIdentifierStart)(state)}${many(choose(f => '$', fuzzCodePointIdentifierContinue, fuzzIdentifierContinue, fuzzSpecialIdentifierContinueCharacter))(state).join('')}`;
 }
 
-const fuzzRegexIdentifierWithValue = state => {
+const fuzzRegExpIdentifierWithValue = state => {
   let identifier;
   let value;
   do {
-    identifier = fuzzRegexIdentifier(state);
+    identifier = fuzzRegExpIdentifier(state);
     let identifierFiltered = identifier.replace(/\\u\{[0-9a-fA-F]+\}/g, (matched) => encodeSurrogatePair(parseInt(matched.slice(3), 16)).map(num => `\\u${padHex(num.toString(16), 4)}`).join(''));
     value = JSON.parse(`"${identifierFiltered}"`);
   } while(state.globalState.definedGroupSpecifiers.find(obj => obj.value === value) || state.globalState.groupSpecifiersToDefine.find(obj => obj.value === value));
   return {identifier, value};
 }
 
-const fuzzRegexIdentifierDeclaration = state => {
+const fuzzRegExpIdentifierDeclaration = state => {
   let identifier
   let value;
   if (state.globalState.groupSpecifiersToDefine.length > 0) {
     ({identifier, value} = state.globalState.groupSpecifiersToDefine.pop());
   } else {
-    ({identifier, value} = fuzzRegexIdentifierWithValue(state));
+    ({identifier, value} = fuzzRegExpIdentifierWithValue(state));
   }
   state.globalState.definedGroupSpecifiers.push({identifier, value});
   return identifier;
 }
 
-const fuzzRegexIdentifierReference = state => {
+const fuzzRegExpIdentifierReference = state => {
   if (state.globalState.definedGroupSpecifiers.length === 0) {
     if (state.globalState.groupSpecifiersToDefine.length === 0) {
-      state.globalState.groupSpecifiersToDefine.push(fuzzRegexIdentifierWithValue(state));
+      state.globalState.groupSpecifiersToDefine.push(fuzzRegExpIdentifierWithValue(state));
     }
     return state.globalState.groupSpecifiersToDefine[state.rng.nextInt(state.globalState.groupSpecifiersToDefine.length)].identifier;
   }
   return state.globalState.definedGroupSpecifiers[state.rng.nextInt(state.globalState.definedGroupSpecifiers.length)].identifier;
 }
 
-const fuzzGroupName = (f, isDeclaration) => `<${isDeclaration ? fuzzRegexIdentifierDeclaration(f) : fuzzRegexIdentifierReference(f)}>`
+const fuzzGroupName = (f, isDeclaration) => `<${isDeclaration ? fuzzRegExpIdentifierDeclaration(f) : fuzzRegExpIdentifierReference(f)}>`
 
 const fuzzGroupSpecifier = (f, isDeclaration) => !f.bugAvoidance.namedGroups ? '' : choose(f => '', f => `?${fuzzGroupName(f, isDeclaration)}`)(f);
 
@@ -535,8 +535,8 @@ const fuzzDisjunction = f => {
   return choose(fuzzAlternative, fuzzManyDisjunctions)(f);
 };
 
-export function engineSupportsRegexUnicode() {
-  let regexp = testRegex('()', 'u');
+export function engineSupportsRegExpUnicode() {
+  let regexp = testRegExp('()', 'u');
   return !!regexp && !!regexp.unicode;
 }
 
