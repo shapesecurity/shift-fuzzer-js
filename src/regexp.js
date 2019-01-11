@@ -10,16 +10,6 @@ function testRegExp(regexp, flags = '', constructor = RegExp) {
   }
 }
 
-export class RegExpBugAvoidanceConfiguration {
-  constructor({ lookbehinds = true }) {
-    this.lookbehinds = lookbehinds;
-  }
-
-  static fromEngine(constructor = RegExp) {
-    return new RegExpBugAvoidanceConfiguration({ lookbehinds: !!testRegExp('(?<=)(?<!)', '', constructor) });
-  }
-}
-
 class RegExpGlobalState {
   constructor() {
     this.noNumericLookahead = false;
@@ -28,7 +18,7 @@ class RegExpGlobalState {
 }
 
 class RegExpState {
-  constructor({maxDepth = 5, rng = new Random(Math.random), unicode = false, requireQuantifiable = false, inClass = false, maxNumber = 100000, globalState = new RegExpGlobalState(), bugAvoidance = new RegExpBugAvoidanceConfiguration()} = {}) {
+  constructor({ maxDepth = 5, rng = new Random(Math.random), unicode = false, requireQuantifiable = false, inClass = false, maxNumber = 100000, globalState = new RegExpGlobalState() }) {
     this.maxDepth = maxDepth;
     this.depth = 0;
     this.rng = rng;
@@ -37,7 +27,6 @@ class RegExpState {
     this.inClass = inClass;
     this.maxNumber = maxNumber;
     this.globalState = globalState;
-    this.bugAvoidance = bugAvoidance;
   }
 
   tooDeep() {
@@ -45,7 +34,7 @@ class RegExpState {
   }
 
   clone() {
-    let st = new RegExpState({maxDepth: this.maxDepth, rng: this.rng, unicode: this.unicode, requireQuantifiable: this.requireQuantifiable, inClass: this.inClass, maxNumber: this.maxNumber, globalState: this.globalState, bugAvoidance: this.bugAvoidance});
+    let st = new RegExpState({ maxDepth: this.maxDepth, rng: this.rng, unicode: this.unicode, requireQuantifiable: this.requireQuantifiable, inClass: this.inClass, maxNumber: this.maxNumber, globalState: this.globalState });
     st.depth = this.depth;
     return st;
   }
@@ -369,10 +358,9 @@ const fuzzRepetition = fuzzer => f => {
   return `${fuzzer(f)}${fuzzQuantifier(f)}`;
 }
 
-const lookarounds = ['?=', '?!', '?<=', '?<!'];
 const lookaheads = ['?=', '?!'];
 
-const fuzzAssertion = f => choose(oneOf('^', '$', '\\b', '\\B'), f => fuzzLookaroundGrouping(f.bugAvoidance.lookbehinds ? lookarounds : lookaheads)(f))(f);
+const fuzzAssertion = f => choose(oneOf('^', '$', '\\b', '\\B'), f => fuzzLookaroundGrouping(lookaheads)(f))(f);
 
 const fuzzTermUnicode = f => choose(fuzzAssertion, fuzzAtom, fuzzRepetition(fuzzAtom))(f);
 
@@ -399,8 +387,8 @@ export function engineSupportsRegExpUnicode() {
   return !!regexp && !!regexp.unicode;
 }
 
-export default function fuzzRegExpPattern(f = {rng: new Random(Math.random)}, unicode = false, bugAvoidance = new RegExpBugAvoidanceConfiguration()) {
-  let state = new RegExpState({rng: f.rng, unicode: unicode, bugAvoidance: bugAvoidance});
+export default function fuzzRegExpPattern(f = {rng: new Random(Math.random)}, unicode = false) {
+  let state = new RegExpState({rng: f.rng, unicode: unicode});
   let rv = fuzzDisjunction(state);
   while (state.globalState.groupSpecifiersToDefine.length > 0) {
     state.globalState.groupSpecifiersToDefine.pop();

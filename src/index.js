@@ -19,7 +19,7 @@ import * as Shift from "shift-ast/checked";
 import FuzzerState from "./fuzzer-state";
 export { FuzzerState };
 import { ap, choose, guardDepth, many, many1, manyN, oneOf, opt, MANY_BOUND } from "./combinators";
-import fuzzRegExpPattern, { RegExpBugAvoidanceConfiguration } from "./regexp";
+import fuzzRegExpPattern from "./regexp";
 import Random from "./random";
 
 
@@ -425,9 +425,9 @@ export const fuzzLiteralNumericExpression = f =>
     f => 0
   )}, f);
 
-export const fuzzLiteralRegExpExpression = (f, canFuzzUnicode = false, bugAvoidance = new RegExpBugAvoidanceConfiguration({ lookbehinds: false })) => {
+export const fuzzLiteralRegExpExpression = (f, canFuzzUnicode = false) => {
   let isUnicode = canFuzzUnicode;
-  return ap(Shift.LiteralRegExpExpression, {"pattern": f => fuzzRegExpPattern(f, isUnicode = isUnicode && f.rng.nextBoolean(), bugAvoidance).replace(/\//g, '\\$0'), "global": f => f.rng.nextBoolean(), "ignoreCase": f => f.rng.nextBoolean(), "multiLine": f => f.rng.nextBoolean(), "sticky": f => f.rng.nextBoolean(), "unicode": f => isUnicode}, f);
+  return ap(Shift.LiteralRegExpExpression, {"pattern": f => fuzzRegExpPattern(f, isUnicode = isUnicode && f.rng.nextBoolean()).replace(/\//g, '\\$0'), "global": f => f.rng.nextBoolean(), "ignoreCase": f => f.rng.nextBoolean(), "multiLine": f => f.rng.nextBoolean(), "sticky": f => f.rng.nextBoolean(), "unicode": f => isUnicode}, f);
 }
 
 export const fuzzLiteralStringExpression = f =>
