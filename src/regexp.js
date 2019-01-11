@@ -132,7 +132,7 @@ const fuzzUnicodeEscape = onlyUnicode => state => {
       f => `\\u${firstFuzzedHex = fuzzHex(f)}${firstFuzzedHex === 'd' || firstFuzzedHex === 'D' ? fuzzHexExcept(f, '89abcdefABCDEF'.split('')) : fuzzHex(f)}${fuzzHex(f)}${fuzzHex(f)}`,
       f => `\\u{${fuzzHexExcept(f, ['0'])}${fuzzHex(f)}${fuzzHex(f)}${fuzzHex(f)}${fuzzHex(f)}}`,
       f => `\\u{10${fuzzHex(f)}${fuzzHex(f)}${fuzzHex(f)}${fuzzHex(f)}}`,
-      f => `\\u${oneOf('d', 'D')(f)}${oneOf('8', '9', 'A', 'B', 'a', 'b')(f)}${fuzzHex(f)}${fuzzHex(f)}\\uD${oneOf('C', 'D', 'E', 'F', 'c', 'd', 'e', 'f')(f)}${fuzzHex(f)}${fuzzHex(f)}`
+      f => `\\u${oneOf('d', 'D')(f)}${oneOf('8', '9', 'A', 'B', 'a', 'b')(f)}${fuzzHex(f)}${fuzzHex(f)}\\u${oneOf('d', 'D')(f)}${oneOf('C', 'D', 'E', 'F', 'c', 'd', 'e', 'f')(f)}${fuzzHex(f)}${fuzzHex(f)}`
     );
   } else {
     unicodeFuzzers.push(
