@@ -95,7 +95,11 @@ const charVal = c => {
 
 
 const fuzzPrintableAscii = f => {
-  return String.fromCharCode(32 + f.rng.nextInt(94));
+  let o = 32 + f.rng.nextInt(94);
+  while (o === 47) { // exclude `/`, which cannot appear unescaped in regexp literals
+    o = 32 + f.rng.nextInt(94);
+  }
+  return String.fromCharCode(o);
 }
 
 const fuzzHexExcept = (f, except) => oneOf(...'01234567890abcdefABCDEF'.split('').filter(hex => except.indexOf(hex) === -1))(f);
