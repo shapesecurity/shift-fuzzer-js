@@ -4,7 +4,7 @@ const {keyword: {isIdentifierES6, isIdentifierNameES6}} = esutils;
 
 import { testRepeatedly, prng } from "./helpers";
 import fuzzProgram, { FuzzerState, fuzzIdentifier, fuzzWhileStatement } from "../";
-import fuzzRegExpPattern, { engineSupportsRegExpUnicode } from "../src/regexp";
+import fuzzRegExpPattern from "../src/regexp";
 
 suite("unit", () => {
   testRepeatedly("fuzzIdentifier produces a valid Identifier (not IdentifierName)", () => {
@@ -35,7 +35,7 @@ suite("unit", () => {
   });
   
   testRepeatedly("fuzzRegExpPattern generates valid regexp", () => {
-    let expression = fuzzRegExpPattern(new FuzzerState(), engineSupportsRegExpUnicode());
+    let expression = fuzzRegExpPattern(new FuzzerState());
     let flags = [
       expression.global ? 'g' : '',
       expression.ignoreCase ? 'i' : '',

@@ -1,14 +1,7 @@
 import Random from "./random";
 import { choose, many, oneOf } from "./combinators";
 import {IDENTIFIER_START, IDENTIFIER_CONTINUE} from "./unicode";
-
-function testRegExp(regexp, flags = '', constructor = RegExp) {
-  try {
-    return constructor(regexp, flags);
-  } catch (e) {
-    return false;
-  }
-}
+import { FuzzerState } from './fuzzer-state';
 
 class RegExpGlobalState {
   constructor() {
@@ -374,12 +367,7 @@ const fuzzDisjunction = f => {
   return choose(fuzzAlternative, fuzzManyDisjunctions)(f);
 };
 
-export function engineSupportsRegExpUnicode() {
-  let regexp = testRegExp('()', 'u');
-  return !!regexp && !!regexp.unicode;
-}
-
-export default function fuzzRegExpPattern(f = {rng: new Random(Math.random)}, unicode = false) {
+export default function fuzzRegExpPattern(f = new FuzzerState, unicode = false) {
   let state = new RegExpState({rng: f.rng, unicode: unicode});
   let rv = fuzzDisjunction(state);
   // TODO we should also count existing ones, to avoid adding these unnecessarily
