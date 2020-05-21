@@ -314,24 +314,13 @@ const illegalRangeItems = ['\\c'];
 const illegalRangeItemsUnicode = ['\\d', '\\D', '\\w', '\\W', '\\s', '\\S', '\\c'];
 
 const fuzzCharacterClassRange = canDash => f => {
-  let toCheckItems = illegalRangeItems;
-  if (f.unicode) {
-    toCheckItems = illegalRangeItemsUnicode;
-  }
+  let toCheckItems = f.unicode ? illegalRangeItemsUnicode : illegalRangeItems;
   let a = guardValue(fuzzClassAtom, value => value.length == 0 || toCheckItems.filter(item => value.startsWith(item)).length > 0)(f);
   let b = guardValue(fuzzClassAtom, value => value.length == 0 || toCheckItems.filter(item => value.startsWith(item)).length > 0)(f);
   let valueA = charVal(a);
   let valueB = charVal(b);
   if (valueA > valueB) {
     [a, b] = [b, a];
-  }
-  if (canDash && '-'.charCodeAt(0) < valueB) {
-    a = oneOf(a, '-')(f);
-    valueA = charVal(a);
-  }
-  if ('-'.charCodeAt(0) >= valueA) {
-    b = oneOf(b, '-')(f);
-    valueB = charVal(b);
   }
   return `${a}-${b}`;
 };
