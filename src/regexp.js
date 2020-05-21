@@ -13,7 +13,7 @@ function testRegExp(regexp, flags = '', constructor = RegExp) {
 class RegExpGlobalState {
   constructor() {
     this.noNumericLookahead = false;
-    this.groupSpecifiersToDefine = 0;
+    this.maxGroupSecifier = 0;
   }
 }
 
@@ -136,10 +136,9 @@ const octal = decimal.slice(0, 8);
 const occupiedEscapes = ['d', 'D', 's', 'S', 'w', 'W', 'f', 'n', 'r', 't', 'v', 'u', 'x', 'b', 'B', 'c', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
 const fuzzDecimalEscape = state => {
-  if (state.globalState.groupSpecifiersToDefine === 0) {
-    ++state.globalState.groupSpecifiersToDefine;
-  }
-  return `\\${state.rng.nextInt(state.globalState.groupSpecifiersToDefine) + 1}`
+  let specifier = state.rng.nextInt(9) + 1; // [1, 9]
+  state.globalState.maxGroupSecifier = Math.max(state.globalState.maxGroupSecifier, specifier);
+  return `\\${specifier}`
 }
 
 const fuzzCharacterEscapes = state => {
@@ -390,8 +389,8 @@ export function engineSupportsRegExpUnicode() {
 export default function fuzzRegExpPattern(f = {rng: new Random(Math.random)}, unicode = false) {
   let state = new RegExpState({rng: f.rng, unicode: unicode});
   let rv = fuzzDisjunction(state);
-  while (state.globalState.groupSpecifiersToDefine.length > 0) {
-    state.globalState.groupSpecifiersToDefine.pop();
+  // TODO we should also count existing ones, to avoid adding these unnecessarily
+  for (let i = 0; i < state.globalState.maxGroupSecifier; ++i) {
     rv += `()`;
   }
   if (rv === '') return '(?:)';
