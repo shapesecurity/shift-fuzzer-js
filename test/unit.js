@@ -2,8 +2,9 @@ import assert from "assert";
 import * as esutils from "esutils";
 const {keyword: {isIdentifierES6, isIdentifierNameES6}} = esutils;
 
-import {testRepeatedly, prng} from "./helpers";
-import fuzzProgram, {FuzzerState, fuzzIdentifier, fuzzWhileStatement} from "../";
+import { testRepeatedly, prng } from "./helpers";
+import fuzzProgram, { FuzzerState, fuzzIdentifier, fuzzWhileStatement } from "../";
+import fuzzRegExpPattern from "../src/regexp";
 
 suite("unit", () => {
   testRepeatedly("fuzzIdentifier produces a valid Identifier (not IdentifierName)", () => {
@@ -31,6 +32,22 @@ suite("unit", () => {
     prng.reset();
     let programB = fuzzProgram(new FuzzerState({rng: prng}));
     assert.deepEqual(programA, programB);
+  });
+  
+  testRepeatedly("fuzzRegExpPattern generates valid regexp", () => {
+    let expression = fuzzRegExpPattern(new FuzzerState());
+    let flags = [
+      expression.global ? 'g' : '',
+      expression.ignoreCase ? 'i' : '',
+      expression.multiline ? 'm' : '',
+      expression.sticky ? 'y' : '',
+      expression.unicode ? 'u' : ''
+    ].join('');
+    try {
+      RegExp(expression.pattern, flags);
+    } catch (e) {
+      throw new Error(`regexp failed: /${expression.pattern}/${flags} error: ${e}`);
+    }
   });
 
   function assertDepthNoGreaterThan(n, ancestry, node) {

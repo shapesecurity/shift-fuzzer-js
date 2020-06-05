@@ -20,6 +20,7 @@ import FuzzerState from "./fuzzer-state";
 export { FuzzerState };
 import { ap, choose, guardDepth, many, many1, manyN, oneOf, opt, MANY_BOUND } from "./combinators";
 import fuzzRegExpPattern from "./regexp";
+import Random from "./random";
 
 
 const RESERVED =  [ // todo import this
@@ -424,8 +425,10 @@ export const fuzzLiteralNumericExpression = f =>
     f => 0
   )}, f);
 
-export const fuzzLiteralRegExpExpression = f =>
-  ap(Shift.LiteralRegExpExpression, {"pattern": fuzzRegExpPattern, "global": f => f.rng.nextBoolean(), "ignoreCase": f => f.rng.nextBoolean(), "multiLine": f => f.rng.nextBoolean(), "sticky": f => f.rng.nextBoolean(), "unicode": f => f.rng.nextBoolean()}, f);
+export const fuzzLiteralRegExpExpression = (f = new FuzzerState, canFuzzUnicode = true) => {
+  let isUnicode = canFuzzUnicode && f.rng.nextBoolean();
+  return ap(Shift.LiteralRegExpExpression, {"pattern": f => fuzzRegExpPattern(f, isUnicode), "global": f => f.rng.nextBoolean(), "ignoreCase": f => f.rng.nextBoolean(), "multiLine": f => f.rng.nextBoolean(), "sticky": f => f.rng.nextBoolean(), "unicode": f => isUnicode}, f);
+}
 
 export const fuzzLiteralStringExpression = f =>
   ap(Shift.LiteralStringExpression, {"value": fuzzString}, f);
