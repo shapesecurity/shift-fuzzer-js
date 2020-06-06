@@ -28,7 +28,7 @@
     "expect.js": "^0.3.1",
     "mocha": "^2.3.4",
     "shift-codegen": "6.0.0",
-    "shift-parser": "6.0.0",
+    "shift-parser": "6.0.1",
     "shift-validator": "4.0.0"
   },
   "keywords": [

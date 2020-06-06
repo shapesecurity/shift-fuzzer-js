@@ -138,20 +138,33 @@ export const fuzzArrayExpression = f =>
   ap(Shift.ArrayExpression, {"elements": many(opt(choose(fuzzExpression, fuzzSpreadElement)))}, f);
 
 export const fuzzArrowExpression = (f = new FuzzerState) => {
-  let isConsise = f.rng.nextBoolean();
   let params, body;
   let isAsync = f.rng.nextBoolean();
-  if (isAsync) {
-    f.allowAwaitIdentifier = false;
-  }
-  if (!isConsise) {
+  let isConcise = f.rng.nextBoolean();
+  // Because of the cover grammar we can't have an `await` identifier in the parameter list of an arrow function if we are in an async context
+  let outerForbidsAwait = !f.allowAwaitIdentifier;
+  if (!isConcise) {
     let {directives, hasStrictDirective} = fuzzDirectives(f);
-    f = f.enterFunction({isArrow: true, hasStrictDirective});
+    f = f.enterFunction({isArrow: true, isAsync, hasStrictDirective});
+    let oldAllowAwaitIdentifier = f.allowAwaitIdentifier;
+    if (outerForbidsAwait) {
+      f.allowAwaitIdentifier = false;
+    }
     params = fuzzFormalParameters(f, {hasStrictDirective});
+    if (outerForbidsAwait) {
+      f.allowAwaitIdentifier = oldAllowAwaitIdentifier;
+    }
     body = new Shift.FunctionBody({directives, statements: many(fuzzStatement)(f.goDeeper())});
   } else {
     f = f.enterFunction({isArrow: true, isAsync});
+    let oldAllowAwaitIdentifier = f.allowAwaitIdentifier;
+    if (outerForbidsAwait) {
+      f.allowAwaitIdentifier = false;
+    }
     params = fuzzFormalParameters(f);
+    if (outerForbidsAwait) {
+      f.allowAwaitIdentifier = oldAllowAwaitIdentifier;
+    }
     body = fuzzExpression(f);
   }
   return new Shift.ArrowExpression({isAsync, params, body});
@@ -317,7 +330,11 @@ export const fuzzForInStatement = (f = new FuzzerState) => {
 
 export const fuzzForOfStatement = (f = new FuzzerState) => {
   f = f.goDeeper();
-  let left = f.rng.nextBoolean() ? fuzzVariableDeclaration(f, {inForInOfHead: true}) : fuzzAssignmentTarget(f);
+  let left;
+  do {
+    left = f.rng.nextBoolean() ? fuzzVariableDeclaration(f, {inForInOfHead: true}) : fuzzAssignmentTarget(f);
+    // https://github.com/tc39/ecma262/issues/2034
+  } while (left.type === 'AssignmentTargetIdentifier' && left.name === 'async');
   let right = fuzzExpression(f);
   let body = fuzzStatement(f.enterLoop(), {allowProperDeclarations: false, allowFunctionDeclarations: false});
   return new Shift.ForOfStatement({left, right, body});
@@ -354,7 +371,7 @@ export const fuzzFunctionDeclaration = (f = new FuzzerState, {allowProperDeclara
     }
   }
   let name = fuzzBindingIdentifier(f);
-  f = f.enterFunction({isGenerator, hasStrictDirective})
+  f = f.enterFunction({isGenerator, isAsync, hasStrictDirective})
   let params = fuzzFormalParameters(f, {hasStrictDirective});
   let body = new Shift.FunctionBody({directives, statements: many(fuzzStatement)(f.goDeeper())});
   return new Shift.FunctionDeclaration({isGenerator, isAsync, name, params, body});
