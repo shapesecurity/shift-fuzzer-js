@@ -328,7 +328,7 @@ export const fuzzForInStatement = (f = new FuzzerState) => {
   return new Shift.ForInStatement({left, right, body});
 }
 
-export const fuzzForOfStatement = (f = new FuzzerState) => {
+function fuzzForOfParts(f) {
   f = f.goDeeper();
   let left;
   do {
@@ -337,8 +337,16 @@ export const fuzzForOfStatement = (f = new FuzzerState) => {
   } while (left.type === 'AssignmentTargetIdentifier' && left.name === 'async');
   let right = fuzzExpression(f);
   let body = fuzzStatement(f.enterLoop(), {allowProperDeclarations: false, allowFunctionDeclarations: false});
-  return new Shift.ForOfStatement({left, right, body});
+  return { left, right, body };
 }
+
+export const fuzzForOfStatement = (f = new FuzzerState) => {
+  return new Shift.ForOfStatement(fuzzForOfParts(f));
+}
+
+const fuzzForAwaitStatement = (f = new FuzzerState) => {
+  return new Shift.ForAwaitStatement(fuzzForOfParts(f))
+};
 
 export const fuzzForStatement = f =>
   ap(Shift.ForStatement, {"init": opt(choose(fuzzExpression, fuzzVariableDeclaration)), "test": opt(fuzzExpression), "update": opt(fuzzExpression), "body": f => fuzzStatement(f.enterLoop(), {allowProperDeclarations: false, allowFunctionDeclarations: false})}, f);
@@ -465,7 +473,7 @@ export const fuzzLiteralNumericExpression = f =>
 
 export const fuzzLiteralRegExpExpression = (f = new FuzzerState, canFuzzUnicode = true) => {
   let isUnicode = canFuzzUnicode && f.rng.nextBoolean();
-  return ap(Shift.LiteralRegExpExpression, {"pattern": f => fuzzRegExpPattern(f, isUnicode), "global": f => f.rng.nextBoolean(), "ignoreCase": f => f.rng.nextBoolean(), "multiLine": f => f.rng.nextBoolean(), "sticky": f => f.rng.nextBoolean(), "unicode": f => isUnicode}, f);
+  return ap(Shift.LiteralRegExpExpression, {"pattern": f => fuzzRegExpPattern(f, isUnicode), "global": f => f.rng.nextBoolean(), "ignoreCase": f => f.rng.nextBoolean(), "multiLine": f => f.rng.nextBoolean(), "dotAll": f => f.rng.nextBoolean(), "unicode": f => isUnicode, "sticky": f => f.rng.nextBoolean()}, f);
 }
 
 export const fuzzLiteralStringExpression = f =>
@@ -512,13 +520,13 @@ export const fuzzNewTargetExpression = f =>
   ap(Shift.NewTargetExpression, {}, f);
 
 export const fuzzObjectAssignmentTarget = f =>
-  ap(Shift.ObjectAssignmentTarget, {"properties": many(choose(fuzzAssignmentTargetPropertyIdentifier, fuzzAssignmentTargetPropertyProperty))}, f);
+  ap(Shift.ObjectAssignmentTarget, {"properties": many(choose(fuzzAssignmentTargetPropertyIdentifier, fuzzAssignmentTargetPropertyProperty)), "rest": opt(choose(fuzzAssignmentTargetIdentifier, choose(fuzzComputedMemberAssignmentTarget, fuzzStaticMemberAssignmentTarget)))}, f);
 
 export const fuzzObjectBinding = f =>
-  ap(Shift.ObjectBinding, {"properties": many(choose(fuzzBindingPropertyIdentifier, fuzzBindingPropertyProperty))}, f);
+  ap(Shift.ObjectBinding, {"properties": many(choose(fuzzBindingPropertyIdentifier, fuzzBindingPropertyProperty)), "rest": opt(fuzzBindingIdentifier)}, f);
 
 export const fuzzObjectExpression = f =>
-  ap(Shift.ObjectExpression, {"properties": many(choose(choose(fuzzDataProperty, choose(fuzzGetter, fuzzMethod, fuzzSetter)), fuzzShorthandProperty))}, f);
+  ap(Shift.ObjectExpression, {"properties": many(choose(choose(fuzzDataProperty, choose(fuzzGetter, fuzzMethod, fuzzSetter)), fuzzShorthandProperty, fuzzSpreadProperty))}, f);
 
 export const fuzzReturnStatement = f =>
   ap(Shift.ReturnStatement, {"expression": opt(fuzzExpression)}, f);
@@ -546,6 +554,9 @@ export const fuzzShorthandProperty = f =>
 
 export const fuzzSpreadElement = f =>
   ap(Shift.SpreadElement, {"expression": fuzzExpression}, f);
+
+export const fuzzSpreadProperty = f =>
+  ap(Shift.SpreadProperty, {"expression": fuzzExpression}, f);
 
 export const fuzzStaticMemberAssignmentTarget = f =>
   ap(Shift.StaticMemberAssignmentTarget, {"object": fuzzExpressionSuperProp, "property": fuzzIdentifierName}, f);
@@ -842,6 +853,9 @@ export const fuzzStatement = (f = new FuzzerState, {allowLoops = true, allowProp
   
   if (f.allowReturn) {
     fuzzers.push(fuzzReturnStatement);
+  }
+  if (f.allowAwaitExpr) {
+    fuzzers.push(fuzzForAwaitStatement);
   }
   if (f.inLoop) {
     fuzzers.push(fuzzBreakStatement, fuzzContinueStatement);

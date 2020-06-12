@@ -18,7 +18,7 @@
     "prepublish": "rm -rf dist/* && npm update && npm run build"
   },
   "dependencies": {
-    "shift-ast": "5.0.0"
+    "shift-ast": "6.1.0"
   },
   "devDependencies": {
     "babel-cli": "6.3.13",
@@ -27,9 +27,9 @@
     "esutils": "2.0.2",
     "expect.js": "^0.3.1",
     "mocha": "^2.3.4",
-    "shift-codegen": "6.0.0",
-    "shift-parser": "6.0.1",
-    "shift-validator": "4.0.0"
+    "shift-codegen": "^7.0.2",
+    "shift-parser": "^7.0.3",
+    "shift-validator": "^5.0.0"
   },
   "keywords": [
     "Shift",
