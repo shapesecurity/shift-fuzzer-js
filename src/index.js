@@ -143,7 +143,18 @@ export const fuzzArrowExpression = (f = new FuzzerState) => {
   let isConcise = f.rng.nextBoolean();
   // Because of the cover grammar we can't have an `await` identifier in the parameter list of an arrow function if we are in an async context
   let outerForbidsAwait = !f.allowAwaitIdentifier;
-  if (!isConcise) {
+  if (isConcise) {
+    f = f.enterFunction({isArrow: true, isAsync});
+    let oldAllowAwaitIdentifier = f.allowAwaitIdentifier;
+    if (outerForbidsAwait) {
+      f.allowAwaitIdentifier = false;
+    }
+    params = fuzzFormalParameters(f);
+    if (outerForbidsAwait) {
+      f.allowAwaitIdentifier = oldAllowAwaitIdentifier;
+    }
+    body = fuzzExpression(f);
+  } else {
     let {directives, hasStrictDirective} = fuzzDirectives(f);
     f = f.enterFunction({isArrow: true, isAsync, hasStrictDirective});
     let oldAllowAwaitIdentifier = f.allowAwaitIdentifier;
@@ -155,17 +166,6 @@ export const fuzzArrowExpression = (f = new FuzzerState) => {
       f.allowAwaitIdentifier = oldAllowAwaitIdentifier;
     }
     body = new Shift.FunctionBody({directives, statements: many(fuzzStatement)(f.goDeeper())});
-  } else {
-    f = f.enterFunction({isArrow: true, isAsync});
-    let oldAllowAwaitIdentifier = f.allowAwaitIdentifier;
-    if (outerForbidsAwait) {
-      f.allowAwaitIdentifier = false;
-    }
-    params = fuzzFormalParameters(f);
-    if (outerForbidsAwait) {
-      f.allowAwaitIdentifier = oldAllowAwaitIdentifier;
-    }
-    body = fuzzExpression(f);
   }
   return new Shift.ArrowExpression({isAsync, params, body});
 }
@@ -330,11 +330,11 @@ export const fuzzForInStatement = (f = new FuzzerState) => {
 
 function fuzzForOfParts(f) {
   f = f.goDeeper();
-  let left;
-  do {
-    left = f.rng.nextBoolean() ? fuzzVariableDeclaration(f, {inForInOfHead: true}) : fuzzAssignmentTarget(f);
-    // https://github.com/tc39/ecma262/issues/2034
-  } while (left.type === 'AssignmentTargetIdentifier' && left.name === 'async');
+  let left = f.rng.nextBoolean() ? fuzzVariableDeclaration(f, {inForInOfHead: true}) : fuzzAssignmentTarget(f);
+  // https://github.com/tc39/ecma262/issues/2034
+  if (left.type === 'AssignmentTargetIdentifier' && left.name === 'async') {
+    left.name = '_async';
+  }
   let right = fuzzExpression(f);
   let body = fuzzStatement(f.enterLoop(), {allowProperDeclarations: false, allowFunctionDeclarations: false});
   return { left, right, body };
@@ -369,11 +369,11 @@ export const fuzzFunctionDeclaration = (f = new FuzzerState, {allowProperDeclara
   let isGenerator = false;
   let isAsync = false;
   if (allowProperDeclarations) {
-    let type = f.rng.nextDouble();
-    if (type < (1 / 3)) {
+    let type = f.rng.nextInt(3);
+    if (type === 0) {
       isGenerator = true;
       f.allowYieldIdentifier = false;
-    } else if (type < (2 / 3)) {
+    } else if (type === 1) {
       isAsync = true;
       f.allowAwaitIdentifier = false;
     }
@@ -390,11 +390,11 @@ export const fuzzFunctionExpression = (f = new FuzzerState) => {
   let {directives, hasStrictDirective} = fuzzDirectives(f);
   let isGenerator = false;
   let isAsync = false;
-  let type = f.rng.nextDouble();
-  if (type < (1 / 3)) {
+  let type = f.rng.nextInt(3);
+  if (type === 0) {
     isGenerator = true;
     f.allowYieldIdentifier = false;
-  } else if (type < (2 / 3)) {
+  } else if (type === 1) {
     isAsync = true;
     f.allowAwaitIdentifier = false;
   }
@@ -473,7 +473,15 @@ export const fuzzLiteralNumericExpression = f =>
 
 export const fuzzLiteralRegExpExpression = (f = new FuzzerState, canFuzzUnicode = true) => {
   let isUnicode = canFuzzUnicode && f.rng.nextBoolean();
-  return ap(Shift.LiteralRegExpExpression, {"pattern": f => fuzzRegExpPattern(f, isUnicode), "global": f => f.rng.nextBoolean(), "ignoreCase": f => f.rng.nextBoolean(), "multiLine": f => f.rng.nextBoolean(), "dotAll": f => f.rng.nextBoolean(), "unicode": f => isUnicode, "sticky": f => f.rng.nextBoolean()}, f);
+  return ap(Shift.LiteralRegExpExpression, {
+    "pattern": f => fuzzRegExpPattern(f, isUnicode),
+    "global": f => f.rng.nextBoolean(),
+    "ignoreCase": f => f.rng.nextBoolean(),
+    "multiLine": f => f.rng.nextBoolean(),
+    "dotAll": f => f.rng.nextBoolean(),
+    "unicode": f => isUnicode,
+    "sticky": f => f.rng.nextBoolean(),
+  }, f);
 }
 
 export const fuzzLiteralStringExpression = f =>
@@ -486,11 +494,11 @@ export const fuzzMethod = (f = new FuzzerState, {isStatic = false, inClass = fal
   let isGenerator = false;
   let isAsync = false;
   if (!isConstructor) {
-    let type = f.rng.nextDouble();
-    if (type < (1 / 3)) {
+    let type = f.rng.nextInt(3);
+    if (type == 0) {
       isGenerator = true;
       f.allowYieldIdentifier = false;
-    } else if (type < (2 / 3)) {
+    } else if (type === 1) {
       isAsync = true;
       f.allowAwaitIdentifier = false;
     }
@@ -811,7 +819,7 @@ export const fuzzExpression = (f = new FuzzerState, {allowIdentifierExpression =
     fuzzers = fuzzers.concat(yieldExprFuzzers);
   }
   if (f.allowAwaitExpr) {
-    fuzzers = fuzzers.concat(fuzzAwaitExpression);
+    fuzzers = fuzzers.concat([fuzzAwaitExpression]);
   }
   if (f.allowNewTarget) {
     fuzzers = fuzzers.concat([fuzzNewTargetExpression]);
