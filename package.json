@@ -29,7 +29,7 @@
     "mocha": "^2.3.4",
     "shift-codegen": "^7.0.3",
     "shift-parser": "^7.0.3",
-    "shift-validator": "^5.0.0"
+    "shift-validator": "^5.0.1"
   },
   "keywords": [
     "Shift",
