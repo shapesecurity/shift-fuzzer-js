@@ -121,8 +121,9 @@ const toRawValue = (f, str) => {
     // }`);
     // str = str.replace(/((^|[^\\])(\\\\)*\\)x/g, `$1x${fuzzHexDigit(f)}${fuzzHexDigit(f)}`); // todo consider inserting escape sequences like \u{XXXXX} etc into strings. This technique works, but not in combination with our hack for dealing with the \u\u case.
     if (f.strict) {
-      str = str.replace(/((^|[^\\])(\\\\)*\\)0([0-7])/g, `$1\\0$4`);
-      str = str.replace(/((^|[^\\])(\\\\)*\\)([1-7])/g, `$1\\$4`);
+      str = str.replace(/((^|[^\\])(\\\\)*\\)0([0-9])/g, `$1\\0$4`);
+      // this should be changed to 1-7 if https://github.com/tc39/ecma262/pull/2054 lands
+      str = str.replace(/((^|[^\\])(\\\\)*\\)([1-9])/g, `$1\\$4`);
     }
   } while(str !== orig); // loop is to handle e.g. \8\8, because javascript lacks lookbehind and faking it is painful.
   return str;
@@ -362,7 +363,7 @@ export const fuzzFormalParameters = (f = new FuzzerState, {hasStrictDirective = 
 }
 
 export const fuzzFunctionBody = f =>
-  ap(Shift.FunctionBody, {"directives": many(fuzzDirective), "statements": many(fuzzStatement)}, f);
+  ap(Shift.FunctionBody, {"directives": fuzzDirectives(f).directives, "statements": many(fuzzStatement)}, f);
 
 export const fuzzFunctionDeclaration = (f = new FuzzerState, {allowProperDeclarations = true} = {}) => {
   let {directives, hasStrictDirective} = fuzzDirectives(f);
