@@ -22,7 +22,6 @@ export default class FuzzerState {
     this.rng = new Random(rng);
 
     this.depth = 0;
-    this.allowAwaitIdentifier = true; // false iff we fuzzing a module
     this.inLoop = false; // allows continue and unlabelled break
     this.inSwitch = false; // allows unlabelled break // todo consider collapsing into one allowBreak, one allowContinue
     this.strict = false;
@@ -34,6 +33,9 @@ export default class FuzzerState {
     this.declKind = null; // const requires initializer; const and let prohibit bindings named let.
     this.allowYieldIdentifier = true;
     this.allowYieldExpr = false; // mutually exclusive with the above, but both can be false, e.g. in formal parameters of or within a generator
+    this.allowAwaitIdentifier = true;
+    this.allowAwaitExpr = false; // mutually exclusive with the above, but both can be false, e.g. in formal parameters
+    this.isModule = false;
 
     this.labels = []; // would use a set, but we need immutibility.
     this.loopLabels = []; // is a subset of labels
@@ -44,7 +46,6 @@ export default class FuzzerState {
     st.maxDepth = this.maxDepth;
     st.rng = this.rng;
     st.depth = this.depth;
-    st.allowAwaitIdentifier = this.allowAwaitIdentifier;
     st.inLoop = this.inLoop;
     st.inSwitch = this.inSwitch;
     st.strict = this.strict;
@@ -56,6 +57,9 @@ export default class FuzzerState {
     st.declKind = this.declKind;
     st.allowYieldIdentifier = this.allowYieldIdentifier;
     st.allowYieldExpr = this.allowYieldExpr;
+    st.allowAwaitIdentifier = this.allowAwaitIdentifier;
+    st.allowAwaitExpr = this.allowAwaitExpr;
+    st.isModule = this.isModule;
     st.labels = this.labels;
     st.loopLabels = this.loopLabels;
     return st;
@@ -93,7 +97,13 @@ export default class FuzzerState {
     return st;
   }
 
-  enterFunction({isGenerator = false, isArrow = false, isMethod = false, hasStrictDirective = false} = {}) {
+  disableAwaitExpr() {
+    let st = this.clone();
+    st.allowAwaitExpr = false;
+    return st;
+  }
+
+  enterFunction({isGenerator = false, isAsync = false, isArrow = false, isMethod = false, hasStrictDirective = false} = {}) {
     let st = this.clone();
     if (st.declKind !== null) throw 'declKind'; // todo remove this
 
@@ -118,6 +128,13 @@ export default class FuzzerState {
         st.allowSuperCall = false;
         st.allowSuperProp = false;
       }
+    }
+    if (isAsync) {
+      st.allowAwaitExpr = true;
+      st.allowAwaitIdentifier = false;
+    } else {
+      st.allowAwaitExpr = false;
+      st.allowAwaitIdentifier = !st.isModule;
     }
     st.allowMissingElse = true;
 
