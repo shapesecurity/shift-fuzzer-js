@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-import Random from "./random";
+const Random = require("./random");
 
-export default class FuzzerState {
+class FuzzerState {
   constructor({maxDepth = 7, rng = Math.random} = {}) {
     this.maxDepth = maxDepth;
     this.rng = new Random(rng);
@@ -157,3 +157,4 @@ export default class FuzzerState {
   }
 }
 
+module.exports = FuzzerState;

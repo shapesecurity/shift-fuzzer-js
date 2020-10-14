@@ -1,10 +1,10 @@
-export function testRepeatedly(desc, fn) {
+function testRepeatedly(desc, fn) {
   test(desc, () => {
     for (let i = 1e2; i > 0; --i) fn();
   });
 }
 
-export const prng = (function(){
+const prng = (function(){
   let i = 0, l = 100;
   let randomNumbers = [];
   for (; i < l; ++i) randomNumbers.push(Math.random());
@@ -15,3 +15,8 @@ export const prng = (function(){
   prng.reset = () => i = 0;
   return prng;
 }());
+
+module.exports = {
+  testRepeatedly,
+  prng,
+};

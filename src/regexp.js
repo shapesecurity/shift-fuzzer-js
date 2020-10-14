@@ -1,7 +1,7 @@
-import Random from "./random";
-import { choose, many, oneOf } from "./combinators";
-import {IDENTIFIER_START, IDENTIFIER_CONTINUE} from "./unicode";
-import { FuzzerState } from './fuzzer-state';
+const Random = require("./random");
+const { choose, many, oneOf } = require("./combinators");
+const { IDENTIFIER_START, IDENTIFIER_CONTINUE } = require("./unicode");
+const { FuzzerState } = require('./fuzzer-state');
 
 class RegExpGlobalState {
   constructor() {
@@ -367,7 +367,7 @@ const fuzzDisjunction = f => {
   return choose(fuzzAlternative, fuzzManyDisjunctions)(f);
 };
 
-export default function fuzzRegExpPattern(f = new FuzzerState, unicode = false) {
+module.exports = function fuzzRegExpPattern(f = new FuzzerState, unicode = false) {
   let state = new RegExpState({rng: f.rng, unicode: unicode});
   let rv = fuzzDisjunction(state);
   // TODO we should also count existing ones, to avoid adding these unnecessarily

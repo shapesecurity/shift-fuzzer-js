@@ -1,6 +1,6 @@
-import { isIdentifierStart, isIdentifierPart } from 'shift-parser/dist/utils.js';
+const { isIdentifierStart, isIdentifierPart } = require('shift-parser/src/utils.js');
 
-export const { IDENTIFIER_START, IDENTIFIER_CONTINUE } = (() => {
+const { IDENTIFIER_START, IDENTIFIER_CONTINUE } = (() => {
 	let starts = [];
 	let continues = [];
 	
@@ -14,3 +14,8 @@ export const { IDENTIFIER_START, IDENTIFIER_CONTINUE } = (() => {
 	}
 	return { IDENTIFIER_START: starts, IDENTIFIER_CONTINUE: continues };
 })();
+
+module.exports = {
+  IDENTIFIER_START,
+  IDENTIFIER_CONTINUE,
+};

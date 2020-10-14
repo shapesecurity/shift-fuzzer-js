@@ -1,6 +1,6 @@
 {
   "name": "shift-fuzzer",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "generate random valid Shift format ASTs",
   "author": "Shape Security",
   "homepage": "https://github.com/shapesecurity/shift-fuzzer-js",
@@ -8,28 +8,23 @@
     "type": "git",
     "url": "https://github.com/shapesecurity/shift-fuzzer-js.git"
   },
-  "main": "dist/index.js",
+  "main": "src/index.js",
   "files": [
-    "dist"
+    "src"
   ],
   "scripts": {
-    "test": "mocha --compilers js:babel-register --inline-diffs --check-leaks --timeout 60000 --slow 30000 --ui tdd --reporter dot --recursive test",
-    "build": "babel --modules commonStrict --source-maps-inline --out-dir dist src",
-    "prepublish": "rm -rf dist/* && npm update && npm run build"
+    "test": "mocha --inline-diffs --check-leaks --timeout 60000 --slow 30000 --ui tdd --reporter dot --recursive test"
   },
   "dependencies": {
-    "shift-ast": "6.1.0"
+    "shift-ast": "7.0.0"
   },
   "devDependencies": {
-    "babel-cli": "6.3.13",
-    "babel-preset-es2015": "6.3.13",
-    "babel-register": "6.3.13",
     "esutils": "2.0.2",
     "expect.js": "^0.3.1",
-    "mocha": "^2.3.4",
-    "shift-codegen": "^7.0.3",
-    "shift-parser": "^7.0.3",
-    "shift-validator": "^5.0.1"
+    "mocha": "^8.1.3",
+    "shift-codegen": "8.0.0",
+    "shift-parser": "8.0.0",
+    "shift-validator": "6.0.0"
   },
   "keywords": [
     "Shift",

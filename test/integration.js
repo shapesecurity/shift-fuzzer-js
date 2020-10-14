@@ -1,10 +1,10 @@
-import expect from "expect.js";
-import {parseScript, parseModule} from "shift-parser";
-import codegen from "shift-codegen";
-import {default as isValid, Validator} from "shift-validator";
+const expect = require("expect.js");
+const {parseScript, parseModule} = require("shift-parser");
+const codegen = require("shift-codegen").default;
+const {isValid, Validator} = require("shift-validator");
 
-import {testRepeatedly} from "./helpers";
-import {fuzzScript, fuzzModule, fuzzLiteralRegExpExpression} from "../";
+const {testRepeatedly} = require("./helpers");
+const {fuzzScript, fuzzModule, fuzzLiteralRegExpExpression} = require("../");
 
 
 suite("integration", () => {
