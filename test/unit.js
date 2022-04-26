@@ -1,10 +1,10 @@
-import assert from "assert";
-import * as esutils from "esutils";
+const assert = require("assert");
+const esutils = require("esutils");
 const {keyword: {isIdentifierES6, isIdentifierNameES6}} = esutils;
 
-import { testRepeatedly, prng } from "./helpers";
-import fuzzProgram, { FuzzerState, fuzzIdentifier, fuzzWhileStatement } from "../";
-import fuzzRegExpPattern from "../src/regexp";
+const { testRepeatedly, prng } = require("./helpers");
+const { fuzzProgram, FuzzerState, fuzzIdentifier, fuzzWhileStatement } = require("../");
+const fuzzRegExpPattern = require("../src/regexp");
 
 suite("unit", () => {
   testRepeatedly("fuzzIdentifier produces a valid Identifier (not IdentifierName)", () => {

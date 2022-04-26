@@ -16,7 +16,7 @@
 
 const MAX_STRING_LENGTH = 5;
 
-export default class Random {
+module.exports = class Random {
   constructor(rng) {
     this.rng = rng;
   }
