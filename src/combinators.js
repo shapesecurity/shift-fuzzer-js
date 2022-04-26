@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-import FuzzerState from "./fuzzer-state";
+const FuzzerState = require("./fuzzer-state");
 
-export const MANY_BOUND = 5;
+const MANY_BOUND = 5;
 
-export function manyN(bound) {
+function manyN(bound) {
   return (fuzzer) =>
     guardDepth(
       () => [],
@@ -32,9 +32,9 @@ export function manyN(bound) {
     );
 }
 
-export const many = manyN(MANY_BOUND);
+const many = manyN(MANY_BOUND);
 
-export function many1(fuzzer) {
+function many1(fuzzer) {
   return (fuzzerState = new FuzzerState) => {
     let result = many(fuzzer)(fuzzerState);
     if (result.length === 0)
@@ -43,12 +43,12 @@ export function many1(fuzzer) {
   };
 }
 
-export function either(fuzzerA, fuzzerB) {
+function either(fuzzerA, fuzzerB) {
   return (fuzzerState = new FuzzerState) =>
     (fuzzerState.rng.nextBoolean() ? fuzzerA : fuzzerB)(fuzzerState);
 }
 
-export function choose(...fuzzers) {
+function choose(...fuzzers) {
   switch(fuzzers.length) {
     case 0:
       throw new Error("choose must be given at least one fuzzer");
@@ -62,12 +62,12 @@ export function choose(...fuzzers) {
   }
 }
 
-export function oneOf(...values) {
+function oneOf(...values) {
   return (fuzzerState) =>
     values[fuzzerState.rng.nextInt(values.length)];
 }
 
-export function opt(fuzzer) {
+function opt(fuzzer) {
   return guardDepth(
     () => null,
     (fuzzerState = new FuzzerState) =>
@@ -75,7 +75,7 @@ export function opt(fuzzer) {
   );
 }
 
-export function ap(ctor, propFuzzers, fuzzerState = new FuzzerState) {
+function ap(ctor, propFuzzers, fuzzerState = new FuzzerState) {
   let f = fuzzerState.goDeeper();
   let props = Object.create(null);
   for (let prop in propFuzzers) {
@@ -85,8 +85,20 @@ export function ap(ctor, propFuzzers, fuzzerState = new FuzzerState) {
   return new ctor(props);
 }
 
-export function guardDepth(fuzzerA, fuzzerB) {
+function guardDepth(fuzzerA, fuzzerB) {
   return (fuzzerState = new FuzzerState) =>
     fuzzerState.tooDeep() ? fuzzerA(fuzzerState) : fuzzerB(fuzzerState);
 }
 
+module.exports = {
+  MANY_BOUND,
+  manyN,
+  many,
+  many1,
+  either,
+  choose,
+  oneOf,
+  opt,
+  ap,
+  guardDepth
+};
