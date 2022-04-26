@@ -214,7 +214,7 @@ const fuzzCallExpression = f =>
   ap(Shift.CallExpression, {"callee": fuzzExpressionSuperCall, "arguments": many(choose(fuzzExpression, fuzzSpreadElement))}, f);
 
 const fuzzCatchClause = f =>
-  ap(Shift.CatchClause, {"binding": fuzzBinding, "body": fuzzBlock}, f);
+  ap(Shift.CatchClause, {"binding": opt(fuzzBinding), "body": fuzzBlock}, f);
 
 const fuzzClassDeclaration = (f = new FuzzerState) => {
   f = f.goDeeper();

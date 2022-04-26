@@ -1,4 +1,4 @@
-const { isIdentifierStart, isIdentifierPart } = require('shift-parser/dist/utils.js');
+const { isIdentifierStart, isIdentifierPart } = require('shift-parser/src/utils.js');
 
 const { IDENTIFIER_START, IDENTIFIER_CONTINUE } = (() => {
 	let starts = [];
