@@ -1,7 +1,7 @@
 const expect = require("expect.js");
 const {parseScript, parseModule} = require("shift-parser");
 const codegen = require("shift-codegen").default;
-const {default: isValid, Validator} = require("shift-validator");
+const {isValid, Validator} = require("shift-validator");
 
 const {testRepeatedly} = require("./helpers");
 const {fuzzScript, fuzzModule, fuzzLiteralRegExpExpression} = require("../");
